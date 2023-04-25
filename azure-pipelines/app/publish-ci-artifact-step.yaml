@@ -1,0 +1,12 @@
+parameters:
+  - name: artifactPath
+    type: string
+  - name: artifactDisplayName
+    type: string
+  - name: artifactName
+    type: string
+steps:
+  - publish: ${{ parameters.artifactPath }}
+    displayName: Publish ${{ parameters.artifactDisplayName }}
+    # condition: eq(variables['Build.SourceBranch'], 'refs/heads/master')
+    artifact: ${{ parameters.artifactName }}

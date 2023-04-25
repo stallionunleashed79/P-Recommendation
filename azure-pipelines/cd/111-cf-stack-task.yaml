@@ -1,0 +1,52 @@
+parameters:
+  condition: ''
+  awsCredentials: ''
+  roleARN: ''
+  regionName: ''
+  applicationName: ''
+  teamName: ''
+  dataClassificationLabel: ''
+  riskDomainLabel: ''
+  environmentName: ''
+  displayName: ''
+  stackName: ''
+  templateFile: ''
+  templateParameters: ''
+
+steps:
+- task: CloudFormationCreateOrUpdateStack@1
+  condition: ${{ parameters.condition }}
+  displayName: ${{ parameters.displayName }}
+  inputs:
+    awsCredentials: ${{ parameters.awsCredentials }}
+    roleARN: ${{ parameters.roleARN }}
+    regionName: ${{ parameters.regionName }}
+    stackName: ${{ parameters.stackName }}
+    templateFile: ${{ parameters.templateFile }}
+    templateParametersSource: inline
+    templateParameters: ${{ parameters.templateParameters }}
+    capabilityIAM: False
+    capabilityNamedIAM: False
+    continueOnError: false
+    captureStackOutputs: asVariables
+    captureAsSecuredVars: false
+    tags: |
+      Name = ${{ parameters.stackName }}
+      applicationid = 10367
+      applicationname = Platform Reco
+      department = Datahub Infrastructure
+      businessowner = Banerjee_Shilpi@cat.com
+      techowner = Gourishetty_Mehar_P@cat.com
+      team = ${{ parameters.teamName }}
+      riskdomain = ${{ parameters.riskDomainLabel }}
+      dataclassification = ${{ parameters.dataClassificationLabel }}
+      dashplatform = datahub
+      dashcomponent = Reco
+      dashbusinessservice = Reco
+      dashfeature = CloudFormation
+      branch-name = $(Build.SourceBranchName)
+      build-number = $(Build.BuildNumber)
+      last-update-azure-pipeline = $(Build.DefinitionName)
+      last-update-individual = $(Build.RequestedFor)
+    onFailure: DELETE
+    timeoutInMins: 40

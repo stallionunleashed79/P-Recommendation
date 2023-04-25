@@ -1,0 +1,44 @@
+%YAML 1.2
+---
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  ShouldCreateSubscription:
+    Type: String
+  TopicName:
+    Type: String
+  EnvironmentName:
+    Type: String
+Conditions:
+  ShouldCreateSubscription: !Equals [!Ref ShouldCreateSubscription, "True"]
+  IsProductionLikeDeployment:
+    !Or [
+      !Equals [!Ref EnvironmentName, int],
+      !Equals [!Ref EnvironmentName, prod]
+    ]
+  CreateSubs: !And
+    - !Condition ShouldCreateSubscription
+    - !Condition IsProductionLikeDeployment
+Resources:
+  TopicStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/sns/topic.yaml
+      Parameters:
+        ExportNamePrefix: !Ref AWS::StackName
+        TopicName: !Ref TopicName
+## This is only for development phase, once the app is fully ready and deployed, please change the endpoint email to support team's email.
+  Subscription:
+    Type: AWS::SNS::Subscription
+    Condition: CreateSubs
+    Properties:
+      Endpoint: akten_huseyin@cat.com
+      Protocol: email
+      TopicArn: !GetAtt TopicStack.Outputs.TopicARN
+  # SubscriptionStack:
+  #   Type: AWS::CloudFormation::Stack
+  #   Condition: IsNotMasterBranchOnboardingDeployment
+  #   Properties:
+  #     TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/sns/subscription.yaml
+  #     Parameters:
+  #       ShouldCreateSubscription: !Ref ShouldCreateSubscription
+  #       TopicARN: !GetAtt TopicStack.Outputs.TopicARN

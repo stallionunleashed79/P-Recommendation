@@ -1,0 +1,42 @@
+%YAML 1.2
+---
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  EnvironmentName:
+    Type: String
+  QualifiedDeploymentName:
+    Type: String
+Mappings:
+  EnvironmentMap:
+    dev:
+      EnvironmentTag: Dev
+    int:
+      EnvironmentTag: Int
+    prod:
+      EnvironmentTag: Prod
+Conditions:
+  IsMasterBranchMainDeployment:
+    !Equals [!Ref QualifiedDeploymentName, "pfm-infra-cva-master-main"]
+Resources:
+  CVAS3Bucket:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/S3.yml
+      Parameters:
+        applicationid: 10367
+        applicationname: !Ref AWS::StackName
+        BucketName: !If
+          - IsMasterBranchMainDeployment
+          - !Sub pfm-infra-cva-s3-${EnvironmentName}
+          - !Ref QualifiedDeploymentName
+        BusinessOwner: Zusko_Andrey@cat.com
+        DataClassification: Red
+        Environment:
+          !FindInMap [EnvironmentMap, !Ref EnvironmentName, EnvironmentTag]
+        ManagedBy: bravo
+        TechnicalOwner: Puri_Ankush@cat.com
+Outputs:
+  BucketName:
+    Value: !GetAtt CVAS3Bucket.Outputs.BucketName
+    Export:
+      Name: !Sub ${QualifiedDeploymentName}-s3-bucket-name

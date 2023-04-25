@@ -1,0 +1,17 @@
+%YAML 1.2
+---
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  CertificateARN:
+    Type: String
+  EnvironmentName:
+    Type: String
+Resources:
+  Stack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/api-gateway/domain-name.yaml
+      Parameters:
+        CertificateARN: !Ref CertificateARN
+        DomainName: !Sub reco.platform.${EnvironmentName}.helios-internal.cat.com
+        ExportName: !Sub "pfm-reco-${EnvironmentName}-external-domain-name"

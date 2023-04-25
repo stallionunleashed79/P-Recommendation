@@ -1,0 +1,80 @@
+server:
+  port: 8080
+
+# Spring Actuator
+management:
+  endpoints:
+    enabled-by-default: false
+    web.exposure.include: "*"
+  endpoint:
+    health.enabled: true
+    metrics.enabled: true
+    info.enabled: true
+# Client services
+client:
+  notification:
+    url: http://localhost:5000/api/v1
+    path: /uploads
+  notes:
+    url: https://services-qa.cat.com
+    path: /catDigital/notes/v1/notes
+    maxNotesPerLevel: 1000
+    maxDepth: 5
+  storage:
+    url: https://services-qa.cat.com
+    path: /catDigital/storage/v1/files/metadata
+
+# OkHttp Client config
+Okhttp:
+  connection:
+    timeout:
+      seconds: 5
+    read:
+      timeout:
+        seconds: 5
+  logging:
+    request: true
+    response: true
+  retry:
+    maximum: 3
+
+# reco properties messages
+cat:
+  template:
+    common:
+      create:
+# fields will be included on create recommendation
+        default:
+           fields: '{ recommendationStatus:"Draft" }'
+# fields must be on the dynamic fields payload
+        required:
+           fields: recommendationPriority
+      update:
+        required:
+           fields: [recommendationStatus, recommendationPriority]
+  timezone:
+    default: UTC
+  recommendation:
+# properties to control the recommendation number generator
+    number:
+      generator:
+        retry: 10
+# biggest number allowed to create, this number must exclude the 0
+        biggest: 999999998
+        algorithm: SHA1PRNG
+
+# global configuration
+global:
+  dealer:
+    region: us-east-2
+  proxy:
+    enable: true
+
+# functional tests parameters
+functionalTest:
+  authServerHost: fedloginqa
+  loginServerHost: loginmcqa.rd
+  clientId: Athena_ig_client
+  redirectUrl: https://int.foresight.cat.com/signin-oidc
+  cwsId: kronoscmcatonlysuperadmtst
+  cwsPassword: willbeplacedbycwsPassword

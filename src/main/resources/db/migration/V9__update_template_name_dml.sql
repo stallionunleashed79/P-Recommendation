@@ -1,0 +1,1 @@
+update recommendation_templates set template_name = 'Template1Default' where template_name = 'Template 1 - Default';

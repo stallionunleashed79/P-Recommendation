@@ -1,0 +1,172 @@
+%YAML 1.2
+---
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  ConfigurationName:
+    Type: String
+  EnvironmentName:
+    Type: String
+  IsProductionLikeDeployment:
+    Type: String
+  QualifiedDeploymentName:
+    Type: String
+  SecurityGroupIDs:
+    Type: String
+  SubnetIDs:
+    Type: String
+Mappings:
+  ConfigurationMap:
+    dev-main:
+      InstanceClassType: db.r4.large
+      SnapshotName: ""
+    int-main:
+      InstanceClassType: db.r4.4xlarge
+      SnapshotName: ""
+      SnowSnsTopic: arn:aws:sns:us-east-2:546945837982:SNOWCatDigitalCustom
+    prod-main:
+      InstanceClassType: db.r4.4xlarge
+      SnapshotName: rds:pfm-infra-cva-2020-07-27-02-09
+      SnowSnsTopic: arn:aws:sns:us-east-2:620890749476:SNOWCatDigitalCustom
+    prod-onboarding:
+      InstanceClassType: db.r4.4xlarge
+      SnapshotName: ""
+      SnowSnsTopic: arn:aws:sns:us-east-2:620890749476:SNOWCatDigitalCustom
+Conditions:
+  IsMasterBranchMainDeployment:
+    !Equals [!Ref QualifiedDeploymentName, "pfm-infra-cva-master-main"]
+  IsProdEnvironmentMainDeployment: !Equals
+    - !Ref ConfigurationName
+    - prod-main
+  IsNotProdEnvironmentMainDeployment: !Not
+    - !Condition IsProdEnvironmentMainDeployment
+  CreateIntProdResources:
+    !Or [
+      !Equals [!Ref EnvironmentName, int],
+      !Equals [!Ref EnvironmentName, prod],
+    ]
+Resources:
+  ClusterParameterGroupStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/rds/db-cluster-parameter-groups/postgres.yaml
+      Parameters:
+        ParameterGroupDescription: !Ref QualifiedDeploymentName
+  PasswordSecretStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/secrets-manager/secrets/aurora-password.yaml
+      Parameters:
+        SecretName: !Ref QualifiedDeploymentName
+
+
+
+  PfmInfraCvaDB:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsNotProdEnvironmentMainDeployment
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aurora/postgres.yaml
+      Parameters:
+        ClusterParameterGroupName: !GetAtt ClusterParameterGroupStack.Outputs.ParameterGroupName
+        ExportNamePrefix: !If
+          - IsMasterBranchMainDeployment
+          - !Sub ${QualifiedDeploymentName}-rds
+          - !Ref AWS::StackName
+        IsProductionLikeDeployment: !If
+          - IsProdEnvironmentMainDeployment
+          - false
+          - !Ref IsProductionLikeDeployment
+        QualifiedDeploymentName: !Ref QualifiedDeploymentName
+        PasswordSecretARN: !GetAtt PasswordSecretStack.Outputs.SecretARN
+        SecurityGroupIDs: !Ref SecurityGroupIDs
+        SubnetIDs: !Ref SubnetIDs
+        Version: 10.7
+        ClusterName: !If
+          - IsMasterBranchMainDeployment
+          - pfm-infra-cva
+          - !Ref AWS::NoValue
+        DatabaseName: !If
+          - IsMasterBranchMainDeployment
+          - pfm_infra_cva
+          - !Ref AWS::NoValue
+  DatabaseStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsProdEnvironmentMainDeployment
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aurora/postgres.yaml
+      Parameters:
+        ClusterParameterGroupName: !GetAtt ClusterParameterGroupStack.Outputs.ParameterGroupName
+        ExportNamePrefix: !Sub ${QualifiedDeploymentName}-2-rds
+        IsProductionLikeDeployment: !Ref IsProductionLikeDeployment
+        QualifiedDeploymentName: !Ref QualifiedDeploymentName
+        PasswordSecretARN: !GetAtt PasswordSecretStack.Outputs.SecretARN
+        SecurityGroupIDs: !Ref SecurityGroupIDs
+        SnapshotIdentifier:
+          !FindInMap [ConfigurationMap, !Ref ConfigurationName, SnapshotName]
+        SubnetIDs: !Ref SubnetIDs
+        Version: 10.7
+        ClusterName: pfm-infra-cva-2
+        DatabaseName: !If
+          - IsMasterBranchMainDeployment
+          - pfm_infra_cva
+          - !Ref AWS::NoValue
+
+
+  InstanceStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsNotProdEnvironmentMainDeployment
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/rds/db-instances/postgres.yaml
+      Parameters:
+        ClassType:
+          !FindInMap [
+            ConfigurationMap,
+            !Ref ConfigurationName,
+            InstanceClassType,
+          ]
+        ClusterName: !GetAtt PfmInfraCvaDB.Outputs.ClusterName
+        InstanceName: !Ref QualifiedDeploymentName
+  InstanceStack2:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsProdEnvironmentMainDeployment
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/rds/db-instances/postgres.yaml
+      Parameters:
+        ClassType:
+          !FindInMap [
+            ConfigurationMap,
+            !Ref ConfigurationName,
+            InstanceClassType,
+          ]
+        ClusterName: !GetAtt DatabaseStack.Outputs.ClusterName
+        InstanceName: !Sub ${QualifiedDeploymentName}-2
+
+
+        
+  DbCpuUsageAlarmMultipleActions:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateIntProdResources
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/cloud-watch/alarms/CloudwatchAlarm_Multiple_Actions.yaml
+      Parameters:
+        AlarmName: !Sub ${QualifiedDeploymentName}-${EnvironmentName}-rds-cpu-utilization-with-service-now-integration
+        AlarmDescription: '"{\"Configuration Item\":\"CAT Digital Platform\",\"AssignTo\":\"CatDigital-PerformanceOperationsCenter-Team\",\"Ticket\":\"True\",\"Impact\":\"medium\",\"Urgency\":\"medium\"}"'
+        TreatMissingData: "ignore"
+        AlarmActionsKey1: "InfraSns"
+        AlarmActionsValue1:
+          Fn::ImportValue: !Sub ${QualifiedDeploymentName}-sns-topic-arn
+        AlarmActionsKey2: "CdocSns"
+        AlarmActionsValue2:
+          !FindInMap [ConfigurationMap, !Ref ConfigurationName, SnowSnsTopic]
+        Namespace: AWS/RDS
+        MetricName: CPUUtilization
+        DimensionsKey1: "DBClusterIdentifier"
+        DimensionsValue1: !If
+          - IsProdEnvironmentMainDeployment
+          - !GetAtt DatabaseStack.Outputs.ClusterName
+          - !GetAtt PfmInfraCvaDB.Outputs.ClusterName
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        Unit: Percent
+        Statistic: "Average"
+        AlarmEvaluationPeriods: 1
+        AlarmEvaluationPeriodSeconds: 120
+        Threshold: 65

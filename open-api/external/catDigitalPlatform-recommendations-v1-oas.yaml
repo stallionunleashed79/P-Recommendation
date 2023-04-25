@@ -1,0 +1,2462 @@
+openapi: 3.0.3
+info:
+  title: Recommendations
+  description: "Recommendation API allow you create, update and retrieve recommendations to manage Condition Monitoring Recommendation."
+  version: 0.4.1
+  contact:
+    name: Helios API Support
+    email: heliosSupport@cat.com
+    url: http://www.cat.com/support
+servers:
+  - url: https://services.cat.com/catDigital/recommendations/v1
+security:
+  - catFedLogin: []
+tags:
+  - name: Recommendations
+    description: Contains all the APIs related to recommendations. Allows to create, update and get recommendations.
+  - name: Templates
+    description: Contains all the APIs related to templates. Allows to get template details used to create recommendations.
+paths:
+  /actuator/health:
+    get:
+      tags:
+        - Actuator Health
+      summary: Get actuator health
+      description: |
+        Perform health check on application
+      operationId: getActuatorHealth
+      parameters:
+        - $ref: '#/components/parameters/X-Cat-API-Tracking-Id'
+      responses:
+        200:
+          description: OK
+        400:
+          $ref: '#/components/responses/400BadRequest'
+        401:
+          $ref: '#/components/responses/401Unauthorized'
+        403:
+          $ref: '#/components/responses/403Forbidden'
+        404:
+          $ref: '#/components/responses/404NotFound'
+        413:
+          $ref: '#/components/responses/413PayloadTooLarge'
+        415:
+          $ref: '#/components/responses/415UnsupportedMediaType'
+        429:
+          $ref: '#/components/responses/429TooManyRequest'
+        500:
+          $ref: '#/components/responses/500InternalServerError'
+        503:
+          $ref: '#/components/responses/503ServiceUnavailable'
+      security:
+        - api_key: []
+      x-amazon-apigateway-integration:
+        uri: "https://${stageVariables.domainName}/actuator/health"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        connectionType: "VPC_LINK"
+        connectionId: "${stageVariables.vpcLinkID}"
+        httpMethod: "GET"
+        type: "http_proxy"
+
+  /recommendations/v1/recommendations:
+    post:
+      tags:
+        - Recommendations
+      summary: Create recommendation
+      description: Use the request to create a recommendation for a specific asset.
+      operationId: createRecommendation
+      parameters:
+        - $ref: '#/components/parameters/X-Cat-API-Tracking-Id'
+        - $ref: '#/components/parameters/X-Cat-User-Preferences'
+      requestBody:
+        description: Request body to create recommendation.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecommendationPostRequest'
+      responses:
+        201:
+          description: Created the recommendation
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+            X-Cat-API-Tracking-Id:
+              $ref: '#/components/headers/X-Cat-API-Tracking-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationDetailsResponse'
+        400:
+          $ref: '#/components/responses/400BadRequest'
+        401:
+          $ref: '#/components/responses/401Unauthorized'
+        403:
+          $ref: '#/components/responses/403Forbidden'
+        404:
+          $ref: '#/components/responses/404NotFound'
+        406:
+          $ref: '#/components/responses/406RequestNotAcceptable'
+        413:
+          $ref: '#/components/responses/413PayloadTooLarge'
+        415:
+          $ref: '#/components/responses/415UnsupportedMediaType'
+        429:
+          $ref: '#/components/responses/429TooManyRequest'
+        500:
+          $ref: '#/components/responses/500InternalServerError'
+        503:
+          $ref: '#/components/responses/503ServiceUnavailable'
+      security:
+        - api_key: []
+      x-amazon-apigateway-integration:
+        uri: "https://${stageVariables.domainName}/recommendations/v1/recommendations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        connectionType: "VPC_LINK"
+        connectionId: "${stageVariables.vpcLinkID}"
+        httpMethod: "POST"
+        type: "http_proxy"
+
+  /recommendations/v1/recommendations/{recommendationNumber}:
+    get:
+      tags:
+        - Recommendations
+      summary: Get Recommendation Details
+      description: Gets the details of a recommendation.
+      operationId: getRecommendationDetails
+      parameters:
+        - $ref: '#/components/parameters/recommendationNumber'
+        - $ref: '#/components/parameters/X-Cat-API-Tracking-Id'
+        - $ref: '#/components/parameters/X-Cat-User-Preferences'
+      responses:
+        200:
+          description: OK
+          headers:
+            X-Cat-API-Tracking-Id:
+              $ref: '#/components/headers/X-Cat-API-Tracking-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationDetailsResponse'
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+              examples:
+                sampleFile:
+                  summary: Recommendation PDF file
+        400:
+          $ref: '#/components/responses/400BadRequest'
+        401:
+          $ref: '#/components/responses/401Unauthorized'
+        403:
+          $ref: '#/components/responses/403Forbidden'
+        404:
+          $ref: '#/components/responses/404NotFound'
+        406:
+          $ref: '#/components/responses/406RequestNotAcceptable'
+        429:
+          $ref: '#/components/responses/429TooManyRequest'
+        500:
+          $ref: '#/components/responses/500InternalServerError'
+        503:
+          $ref: '#/components/responses/503ServiceUnavailable'
+      security:
+        - api_key: []
+      x-amazon-apigateway-integration:
+        requestParameters:
+          integration.request.header.x-amzn-requestid: context.requestId
+          integration.request.path.recommendationNumber: "method.request.path.recommendationNumber"
+        uri: "https://${stageVariables.domainName}/recommendations/v1/recommendations/{recommendationNumber}"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        connectionType: "VPC_LINK"
+        connectionId: "${stageVariables.vpcLinkID}"
+        httpMethod: "GET"
+        type: "http_proxy"
+    put:
+      tags:
+        - Recommendations
+      summary: Update recommendation
+      description: Use the request to update existing recommendations with the input values.
+      operationId: updateRecommendation
+      parameters:
+        - $ref: '#/components/parameters/recommendationNumber'
+        - $ref: '#/components/parameters/X-Cat-API-Tracking-Id'
+        - $ref: '#/components/parameters/X-Cat-User-Preferences'
+      requestBody:
+        description: Recommendation is updated for the given input.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecommendationPutRequest"
+      responses:
+        200:
+          description: Updated the recommendation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationDetailsResponse'
+        400:
+          $ref: '#/components/responses/400BadRequest'
+        401:
+          $ref: '#/components/responses/401Unauthorized'
+        403:
+          $ref: '#/components/responses/403Forbidden'
+        404:
+          $ref: '#/components/responses/404NotFound'
+        406:
+          $ref: '#/components/responses/406RequestNotAcceptable'
+        413:
+          $ref: '#/components/responses/413PayloadTooLarge'
+        415:
+          $ref: '#/components/responses/415UnsupportedMediaType'
+        429:
+          $ref: '#/components/responses/429TooManyRequest'
+        500:
+          $ref: '#/components/responses/500InternalServerError'
+        503:
+          $ref: '#/components/responses/503ServiceUnavailable'
+      security:
+        - api_key: []
+      x-amazon-apigateway-integration:
+        requestParameters:
+          integration.request.header.x-amzn-requestid: context.requestId
+          integration.request.path.recommendationNumber: "method.request.path.recommendationNumber"
+        uri: "https://${stageVariables.domainName}/recommendations/v1/recommendations/{recommendationNumber}"
+        responses:
+          default:
+            statusCode: "204"
+        passthroughBehavior: "when_no_match"
+        connectionType: "VPC_LINK"
+        connectionId: "${stageVariables.vpcLinkID}"
+        httpMethod: "PUT"
+        type: "http_proxy"
+
+  /recommendations/v1/recommendations/{recommendationNumber}/publish:
+    post:
+      tags:
+        - Recommendations
+      summary: Send recommendation to dealer
+      description: Use the request to send/publish this recommendation to the dealer through notification in asynchronous way.
+      operationId: publishRecommendation
+      parameters:
+        - $ref: '#/components/parameters/recommendationNumber'
+        - $ref: '#/components/parameters/X-Cat-API-Tracking-Id'
+        - $ref: '#/components/parameters/X-Cat-User-Preferences'
+      requestBody:
+        description: Recommendation is published for the given payload.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecommendationPublishRequest"
+      responses:
+        204:
+          $ref: '#/components/responses/204NoContent'
+        400:
+          $ref: '#/components/responses/400BadRequest'
+        401:
+          $ref: '#/components/responses/401Unauthorized'
+        403:
+          $ref: '#/components/responses/403Forbidden'
+        404:
+          $ref: '#/components/responses/404NotFound'
+        413:
+          $ref: '#/components/responses/413PayloadTooLarge'
+        415:
+          $ref: '#/components/responses/415UnsupportedMediaType'
+        429:
+          $ref: '#/components/responses/429TooManyRequest'
+        500:
+          $ref: '#/components/responses/500InternalServerError'
+        503:
+          $ref: '#/components/responses/503ServiceUnavailable'
+      security:
+        - api_key: []
+      x-amazon-apigateway-integration:
+        requestParameters:
+          integration.request.header.x-amzn-requestid: context.requestId
+          integration.request.path.recommendationNumber: "method.request.path.recommendationNumber"
+        uri: "https://${stageVariables.domainName}/recommendations/v1/recommendations/{recommendationNumber}/publish"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        connectionType: "VPC_LINK"
+        connectionId: "${stageVariables.vpcLinkID}"
+        httpMethod: "POST"
+        type: "http_proxy"
+
+  /recommendations/v1/recommendations/{recommendationNumber}/statistics:
+    get:
+      tags:
+        - Recommendations
+      summary: Get recommendation statistics
+      description: Use the request to get the statistics of the attachments that are going to be included or excluded from recommendation email.
+      operationId: getStatistics
+      parameters:
+        - $ref: '#/components/parameters/recommendationNumber'
+        - $ref: '#/components/parameters/X-Cat-API-Tracking-Id'
+        - $ref: '#/components/parameters/X-Cat-User-Preferences'
+      responses:
+        200:
+          $ref: '#/components/responses/StatisticsResponse'
+        400:
+          $ref: '#/components/responses/400BadRequest'
+        401:
+          $ref: '#/components/responses/401Unauthorized'
+        403:
+          $ref: '#/components/responses/403Forbidden'
+        404:
+          $ref: '#/components/responses/404NotFound'
+        406:
+          $ref: '#/components/responses/406RequestNotAcceptable'
+        429:
+          $ref: '#/components/responses/429TooManyRequest'
+        500:
+          $ref: '#/components/responses/500InternalServerError'
+        503:
+          $ref: '#/components/responses/503ServiceUnavailable'
+      security:
+        - api_key: []
+      x-amazon-apigateway-integration:
+        requestParameters:
+          integration.request.header.x-amzn-requestid: context.requestId
+          integration.request.path.recommendationNumber: "method.request.path.recommendationNumber"
+        uri: "https://${stageVariables.domainName}/recommendations/v1/recommendations/{recommendationNumber}/statistics"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        connectionType: "VPC_LINK"
+        connectionId: "${stageVariables.vpcLinkID}"
+        httpMethod: "GET"
+        type: "http_proxy"
+
+  /recommendations/v1/templates:
+    get:
+      tags:
+        - Templates
+      summary: List templates
+      description: Returns a list of available recommendation templates.
+      operationId: getTemplateNames
+      parameters:
+        - $ref: '#/components/parameters/X-Cat-API-Tracking-Id'
+        - $ref: '#/components/parameters/X-Cat-User-Preferences'
+      responses:
+        200:
+          $ref: '#/components/responses/TemplateListResponse'
+        400:
+          $ref: '#/components/responses/400BadRequest'
+        401:
+          $ref: '#/components/responses/401Unauthorized'
+        403:
+          $ref: '#/components/responses/403Forbidden'
+        404:
+          $ref: '#/components/responses/404NotFound'
+        406:
+          $ref: '#/components/responses/406RequestNotAcceptable'
+        429:
+          $ref: '#/components/responses/429TooManyRequest'
+        500:
+          $ref: '#/components/responses/500InternalServerError'
+        503:
+          $ref: '#/components/responses/503ServiceUnavailable'
+      security:
+        - api_key: []
+      x-amazon-apigateway-integration:
+        requestParameters:
+          integration.request.header.x-amzn-requestid: context.requestId
+        uri: "https://${stageVariables.domainName}/recommendations/v1/templates"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        connectionType: "VPC_LINK"
+        connectionId: "${stageVariables.vpcLinkID}"
+        httpMethod: "GET"
+        type: "http_proxy"
+
+  /recommendations/v1/templates/{templateName}:
+    get:
+      tags:
+        - Templates
+      summary: Get template properties
+      description: Use this request to get a list of all the custom properties of a template.
+      operationId: getTemplateCustomProperties
+      parameters:
+        - $ref: '#/components/parameters/templateName'
+        - $ref: '#/components/parameters/X-Cat-API-Tracking-Id'
+        - $ref: '#/components/parameters/X-Cat-User-Preferences'
+      responses:
+        200:
+          $ref: '#/components/responses/TemplatePropertiesResponse'
+        400:
+          $ref: '#/components/responses/400BadRequest'
+        401:
+          $ref: '#/components/responses/401Unauthorized'
+        403:
+          $ref: '#/components/responses/403Forbidden'
+        404:
+          $ref: '#/components/responses/404NotFound'
+        406:
+          $ref: '#/components/responses/406RequestNotAcceptable'
+        429:
+          $ref: '#/components/responses/429TooManyRequest'
+        500:
+          $ref: '#/components/responses/500InternalServerError'
+        503:
+          $ref: '#/components/responses/503ServiceUnavailable'
+      security:
+        - api_key: []
+      x-amazon-apigateway-integration:
+        requestParameters:
+          integration.request.header.x-amzn-requestid: context.requestId
+          integration.request.path.templateName: "method.request.path.templateName"
+        uri: "https://${stageVariables.domainName}/recommendations/v1/templates/{templateName}"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        connectionType: "VPC_LINK"
+        connectionId: "${stageVariables.vpcLinkID}"
+        httpMethod: "GET"
+        type: "http_proxy"
+
+  /recommendations/v1/recommendations/search:
+    post:
+      tags:
+        - Recommendations
+      summary: Search recommendations
+      description: |
+        Returns a collection of recommendation. You can request a response
+        as a JSON body or a zip-compressed CSV file stream by setting the `accept` header to
+        `application/json` (default value if no header provided) or `application/octet-stream`.
+         Use the `*.zip` extension to save the streamed file.
+      operationId: getRecommendationSearch
+      parameters:
+        - $ref: '#/components/parameters/X-Cat-API-Tracking-Id'
+        - $ref: '#/components/parameters/X-Cat-User-Preferences'
+        - $ref: '#/components/parameters/sortBy'
+        - $ref: '#/components/parameters/orderBy'
+        - $ref: '#/components/parameters/cursor'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/skip'
+        - $ref: '#/components/parameters/recommendationSearchValue'
+      requestBody:
+        description: List of filtering criteria to narrow down result set.
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FiltersAndResponseAttributesRequest'
+      responses:
+        200:
+          description: OK
+          headers:
+            X-Cat-API-Tracking-Id:
+              $ref: '#/components/headers/X-Cat-API-Tracking-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recommendations'
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        400:
+          $ref: '#/components/responses/400BadRequest'
+        401:
+          $ref: '#/components/responses/401Unauthorized'
+        403:
+          $ref: '#/components/responses/403Forbidden'
+        404:
+          $ref: '#/components/responses/404NotFound'
+        406:
+          $ref: '#/components/responses/406RequestNotAcceptable'
+        413:
+          $ref: '#/components/responses/413PayloadTooLarge'
+        415:
+          $ref: '#/components/responses/415UnsupportedMediaType'
+        429:
+          $ref: '#/components/responses/429TooManyRequest'
+        500:
+          $ref: '#/components/responses/500InternalServerError'
+        503:
+          $ref: '#/components/responses/503ServiceUnavailable'
+      security:
+        - api_key: []
+      x-amazon-apigateway-integration:
+        requestParameters:
+          integration.request.header.x-amzn-requestid: context.requestId
+        uri: "https://${stageVariables.domainName}/recommendations/v1/recommendations/search"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        connectionType: "VPC_LINK"
+        connectionId: "${stageVariables.vpcLinkID}"
+        httpMethod: "POST"
+        type: "http_proxy"
+
+components:
+
+  headers:
+    Location:
+      description: Location of the resource.
+      required: true
+      schema:
+        type: string
+        example: /recommendations/REC-123-456-789
+    X-Cat-API-Tracking-Id:
+      description: A unique ID generated for each request.
+      required: false
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    RecommendationNumber:
+      type: string
+      description: System generated number to identify a Recommendation.
+      format: string
+      example: 'REC 123-456-789'
+    AssetId:
+      type: string
+      example: CAT|RXZ00353|2969412354
+      description: Asset identifier.
+    AssetName:
+      type: string
+      example: ABC123
+      description: The name of the asset defined by the customer or dealer.
+    TemplateName:
+      type: string
+      example: Default template
+      description: Recommendation template name.
+    Title:
+      type: string
+      description: Title of the recommendation.
+      maxLength: 200
+      example: Draft Recommendation
+    SerialNumber:
+      type: string
+      description: Asset serial number.
+      example: CAT12345
+    Make:
+      type: string
+      description: Asset manufacturer code.
+      example: CAT
+    Model:
+      type: string
+      description: Model of the asset.
+      example: 797F
+    Site:
+      type: string
+      example: Asset location
+      description: Location alias name to identify group of assets located at a mine site or construction site.
+    TimeUoM:
+      description: |
+        Time unit of measure. Supported values are:
+          * h (hour)
+          * min (minute)
+          * s (second).
+      allOf:
+        - $ref: '#/components/schemas/UnitOfMeasure'
+        - type: object
+          properties:
+            value:
+              type: string
+              description: Unit of measure enumeration for time.
+              enum: [h, min, s]
+    UnitOfMeasure:
+      type: object
+      description: Base model for all units of measure in the platform.
+      properties:
+        type:
+          type: string
+          description: Available types of measurements in the Cat data.
+          enum:
+            - time
+            - storage
+    StorageUoM:
+      description: |
+        Storage unit of measure. Supported values are:
+          * MB
+      allOf:
+        - $ref: '#/components/schemas/UnitOfMeasure'
+        - type: object
+          properties:
+            value:
+              type: string
+              description: Unit of measure enumeration for storage.
+              enum: [MB]
+      example:
+        type: storage
+        value: MB
+    HoursReading:
+      type: object
+      required:
+        - reading
+        - unitOfMeasure
+      description: Service hours reading data.
+      properties:
+        reading:
+          type: number
+          description: Service hours reading of the asset at the time of creating recommendation.
+          format: double
+          minimum: 0.0
+          example: 34.10
+        unitOfMeasure:
+          $ref: '#/components/schemas/TimeUoM'
+    Status:
+      type: string
+      description: |
+        This property represents status of the file. It could be
+        'awaitingUpload' when file is not uploaded yet or 'uploaded' when it's
+        already in the storage and can be downloaded.
+      enum:
+        - 'awaitingUpload'
+        - 'uploaded'
+      example: 'uploaded'
+    DataType:
+      type: string
+      description: Base model for all data types allowed in the template definition.
+      enum:
+        - 'String'
+        - 'Integer'
+        - 'Double'
+    InputType:
+      type: string
+      description: Base model for all input types allowed in the template definition.
+      enum:
+        - 'text'
+        - 'textarea'
+        - 'dropdown'
+        - 'checkbox'
+        - 'button'
+        - 'lookup'
+        - 'date'
+        - 'section-header-pill-right'
+        - 'section-footer-label-right'
+    ContainerType:
+      type: string
+      description: Base model of all the containers types allowed in the template definition.
+      enum:
+        - 'Accordion'
+        - 'Form'
+        - 'Grid'
+        - 'Table'
+    PropertyOption:
+      type: object
+      required:
+        - name
+        - value
+      description: Based model of property options in the template.
+      properties:
+        name:
+          type: string
+          example: url
+          description: Name of the identifier of the property option.
+        value:
+          type: string
+          example: https://services.cat.com/catDigital/usermanagement/v1/{catRecID}
+          description: Value of the property option.
+    BaseOwner:
+      type: object
+      required:
+        - catrecid
+      description: The owner of the recommendation.
+      properties:
+        catrecid:
+          type: string
+          example: 'AAA-98765432'
+          description: The recommendation owner, the value will be extracted from the logged in user if not provided.
+    User:
+      type: object
+      allOf:
+        - '$ref': '#/components/schemas/BaseOwner'
+      description: User can be the CAT User or Dealer User.
+      properties:
+        firstName:
+          type: string
+          description: First name of user.
+          example: John
+        lastName:
+          type: string
+          description: Last name of User.
+          example: Smith
+    DateTime:
+      type: string
+      format: date-time
+      pattern: ^\d{4}-\d\d-\d\d[Tt]\d\d:\d\d:\d\d(\.\d+)?(([+-]\d\d:\d\d)|[Zz])?$
+      description: |
+        A date-time.
+        For more information about the date-time format, see https://tools.ietf.org/html/rfc3339.
+      example: '2020-03-06T17:27:04.222Z'
+    ExpirationTime:
+      description: |
+        When the recommendation should expire.
+        Formatted string that represents date, time and timezone offset in ISO-8601 format.
+        For more information see https://tools.ietf.org/html/rfc3339.
+      allOf:
+        - $ref: '#/components/schemas/DateTime'
+    CustomerName:
+      type: string
+      description: Name of the customer.
+      example: "Waste Management"
+    CreatedTime:
+      description: |
+        When the recommendation was created.
+        Formatted string that represents date, time and timezone offset in ISO-8601 format.
+        For more information see https://tools.ietf.org/html/rfc3339.
+      allOf:
+        - $ref: '#/components/schemas/DateTime'
+    UpdatedTime:
+      description: |
+        When the recommendation was last updated.
+        Formatted string that represents date, time and timezone offset in ISO-8601 format.
+        For more information see https://tools.ietf.org/html/rfc3339.
+      allOf:
+        - $ref: '#/components/schemas/DateTime'
+    FileAttachedTime:
+      description: |
+        When the file was attached to the recommendation.
+        Formatted string that represents date, time and timezone offset in ISO-8601 format.
+        For more information see https://tools.ietf.org/html/rfc3339.
+      allOf:
+        - $ref: '#/components/schemas/DateTime'
+    LinkAttachedTime:
+      description: |
+        When the link was attached to the recommendation.
+        Formatted string that represents date, time and timezone offset in ISO-8601 format.
+        For more information see https://tools.ietf.org/html/rfc3339.
+      allOf:
+        - $ref: '#/components/schemas/DateTime'
+    TemplateCustomFields:
+      type: object
+      required:
+        - propertyName
+        - propertyValue
+      description: Property of a request that changed with template.
+      properties:
+        propertyName:
+          type: string
+          example: 'priority'
+          description: Name of the property.
+        propertyValue:
+          type: string
+          example: '3 - At Next Service'
+          description: Value of the property.
+    AssetMetaData:
+      description: Asset Meta Data of the asset associated with the recommendation.
+      type: object
+      required:
+        - serialNumber
+        - make
+        - model
+        - name
+        - iconUrl
+        - productFamily
+      properties:
+        serialNumber:
+          $ref: '#/components/schemas/SerialNumber'
+        make:
+          $ref: '#/components/schemas/Make'
+        model:
+          $ref: '#/components/schemas/Model'
+        name:
+          $ref: '#/components/schemas/AssetName'
+        iconUrl:
+          type: string
+          description: URL of the default or customer-uploaded image of the asset.
+          example: "https://services.cat.com/images/wheelloader.png"
+        productFamily:
+          required:
+            - code
+            - name
+            - iconUrl
+          type: object
+          properties:
+            code:
+              type: string
+              description: Code for Product Family of Asset.
+              example: "mwl"
+            name:
+              type: string
+              description: Name for Product Family of Asset.
+              example: "Medium wheel loader"
+            iconUrl:
+              type: string
+              format: uri
+              description: Url of the default image of the product family.
+              example: "https://services.cat.com/images/2WS23456.png"
+    AssetOwnershipAtRecommendation:
+      description: Asset owner information for the recommendation.
+      type: object
+      required:
+        - dealerName
+        - ucid
+        - ucidName
+      properties:
+        dealerCode:
+          type: string
+          description: Code of the dealer.
+          example: "TD00"
+        dealerName:
+          type: string
+          description: Name of the dealer.
+          example: "Holt"
+        ucid:
+          type: string
+          description: UCID of the customer.
+          example: "25669890"
+        ucidName:
+          $ref: '#/components/schemas/CustomerName'
+    CommonFields:
+      type: object
+      required:
+        - owner
+      description: The common fields part of the recommendation request body.
+      properties:
+        owner:
+          $ref: '#/components/schemas/BaseOwner'
+        hoursReading:
+          $ref: '#/components/schemas/HoursReading'
+        site:
+          $ref: '#/components/schemas/Site'
+        title:
+          $ref: '#/components/schemas/Title'
+        expirationTime:
+          $ref: '#/components/schemas/ExpirationTime'
+    TemplateInformation:
+      type: object
+      description: Template name and description.
+      required:
+        - name
+        - description
+      properties:
+        name:
+          $ref: '#/components/schemas/TemplateName'
+        description:
+          type: string
+          example: 'Standard recommendation template to handle generic recommendation object'
+          description: Description of the template.
+    TemplateListResponse:
+      type: array
+      description: List of template names.
+      items:
+        $ref: '#/components/schemas/TemplateInformation'
+      minItems: 1
+      example:
+        - name: 'Default template'
+          description: 'Standard recommendation template to handle generic recommendation object.'
+        - name: 'Template 1'
+          description: 'Additional Template for a more specific recommendation.'
+    TemplatePropertiesList:
+      type: array
+      description: Template properties contains information that will be used for create a recommendation.
+      items:
+        $ref: '#/components/schemas/TemplateProperties'
+      example:
+        - sectionName: 'Recommendation'
+          sectionPosition: 0
+          sectionContainerType: 'Form'
+          sectionProperties:
+            - propertyName: 'recommendationStatus'
+              displayName: 'Status'
+              dataType: 'String'
+              inputType: 'section-header-pill-right'
+              isRequired: true
+              isReadOnly: true
+              position: 0
+              defaultValue: 'Draft'
+              propertyOptions:
+                - name: 'Draft'
+                  value: 'Draft'
+                - name: 'Published'
+                  value: 'Published'
+                - name: 'Expired'
+                  value: 'Expired'
+                - name: 'Completed'
+                  value: 'Completed'
+
+            - propertyName: 'title'
+              displayName: 'Title'
+              dataType: 'String'
+              inputType: 'text'
+              isRequired: true
+              isReadOnly: false
+              position: 1
+              defaultValue: ''
+              propertyOptions: []
+              minimumPropertyLength: 10
+              maximumPropertyLength: 200
+
+            - propertyName: 'recommendationPriority'
+              displayName: 'Priority'
+              dataType: 'String'
+              inputType: 'dropdown'
+              isRequired: true
+              isReadOnly: false
+              position: 2
+              defaultValue: '3 - At Next Service'
+              propertyOptions:
+                - name: '1 - Immediate Attention'
+                  value: '1 - Immediate Attention'
+                - name: '2 - At Next Stop'
+                  value: '2 - At Next Stop'
+                - name: '3 - At Next Service'
+                  value: '3 - At Next Service'
+                - name: '4 - Equipment Backlog'
+                  value: '4 - Equipment Backlog'
+                - name: '5 - Information/Monitor'
+                  value: '5 - Information/Monitor'
+            - propertyName: 'smu'
+              displayName: 'SMU'
+              dataType: 'Double'
+              inputType: 'text'
+              isRequired: true
+              isReadOnly: false
+              position: 3
+              defaultValue: '0'
+              propertyOptions: []
+
+            - propertyName: 'recommendationNumber'
+              displayName: 'Recommendation Number'
+              dataType: 'String'
+              inputType: 'text'
+              isRequired: true
+              isReadOnly: true
+              position: 4
+              defaultValue: ''
+              propertyOptions: []
+              minimumPropertyLength: 15
+
+            - propertyName: 'recommendationOwner'
+              displayName: 'Owner'
+              dataType: 'String'
+              inputType: 'lookup'
+              isRequired: true
+              isReadOnly: false
+              position: 5
+              defaultValue: ''
+              propertyOptions:
+                - name: 'url'
+                  value: 'https://services.cat.com/catDigital/usermanagement/v1/users/search?username={username}'
+
+            - propertyName: 'expirationTime'
+              displayName: 'Expiration Date'
+              dataType: 'String'
+              inputType: 'date'
+              isRequired: false
+              isReadOnly: false
+              position: 6
+              defaultValue: ''
+              propertyOptions: []
+
+            - propertyName: 'assetId'
+              displayName: 'Asset ID'
+              dataType: 'String'
+              inputType: 'text'
+              isRequired: false
+              isReadOnly: true
+              position: 7
+              defaultValue: ''
+              propertyOptions: []
+
+            - propertyName: 'customer'
+              displayName: 'Customer'
+              dataType: 'String'
+              inputType: 'text'
+              isRequired: false
+              isReadOnly: true
+              position: 8
+              defaultValue: ''
+              propertyOptions: []
+
+            - propertyName: 'site'
+              displayName: 'Site'
+              dataType: 'String'
+              inputType: 'text'
+              isRequired: false
+              isReadOnly: true
+              position: 9
+              defaultValue: ''
+              propertyOptions: []
+
+            - propertyName: 'recommendationAction'
+              displayName: 'Recommendation Action'
+              dataType: 'String'
+              inputType: 'textarea'
+              isRequired: true
+              isReadOnly: false
+              position: 10
+              defaultValue: ''
+              propertyOptions: []
+              minimumPropertyLength: 50
+              maximumPropertyLength: 5000
+
+            - propertyName: 'createdTime'
+              displayName: 'Created on'
+              dataType: 'DateTime'
+              inputType: 'section-footer-label-right'
+              isRequired: false
+              isReadOnly: true
+              position: 11
+              defaultValue: ''
+
+            - propertyName: 'createdBy'
+              displayName: 'by'
+              dataType: 'User'
+              inputType: 'section-footer-label-right'
+              isRequired: false
+              isReadOnly: true
+              position: 12
+              defaultValue: ''
+
+            - propertyName: 'updatedTime'
+              displayName: 'Last Modified on'
+              dataType: 'DateTime'
+              inputType: 'section-footer-label-right'
+              isRequired: false
+              isReadOnly: true
+              position: 13
+              defaultValue: ''
+
+            - propertyName: 'updatedBy'
+              displayName: 'by'
+              dataType: 'User'
+              inputType: 'section-footer-label-right'
+              isRequired: false
+              isReadOnly: true
+              position: 14
+              defaultValue: ''
+
+        - sectionName: 'Recommendation Details'
+          sectionPosition: 1
+          sectionContainerType: 'Form'
+          sectionProperties:
+            - propertyName: 'recommendationDetails'
+              displayName: 'Description'
+              dataType: 'String'
+              inputType: 'textarea'
+              isRequired: true
+              isReadOnly: false
+              position: 1
+              defaultValue: ''
+              propertyOptions: []
+              minimumPropertyLength: 50
+              maximumPropertyLength: 5000
+
+        - sectionName: 'Links & Attachments'
+          sectionPosition: 2
+          sectionContainerType: 'Form'
+          sectionProperties:  []
+
+        - sectionName: 'Value Estimate'
+          sectionPosition: 3
+          sectionContainerType: 'Form'
+          sectionProperties:
+            - propertyName: 'valueEstimateCurrency'
+              displayName: 'Currency'
+              dataType: 'String'
+              inputType: 'dropdown'
+              isRequired: false
+              isReadOnly: false
+              position: 0
+              defaultValue: ''
+              propertyOptions:
+                - name: 'US Dollar'
+                  value: 'US Dollar'
+                - name: 'Euro'
+                  value: 'Euro'
+
+            - propertyName: 'valueEstimateFailureCost'
+              displayName: 'Estimate Failure Cost'
+              dataType: 'Double'
+              inputType: 'text'
+              isRequired: false
+              isReadOnly: false
+              position: 1
+              defaultValue: ''
+              propertyOptions: []
+
+            - propertyName: 'valueEstimateRepairCost'
+              displayName: 'Repair Cost'
+              dataType: 'Double'
+              inputType: 'text'
+              isRequired: false
+              isReadOnly: false
+              position: 2
+              defaultValue: ''
+              propertyOptions: []
+
+            - propertyName: 'valueEstimateRecommendationValue'
+              displayName: 'Recommendation Value'
+              dataType: 'Double'
+              inputType: 'text'
+              isRequired: false
+              isReadOnly: true
+              position: 3
+              defaultValue: ''
+              propertyOptions: []
+
+            - propertyName: 'valueEstimateDescription'
+              displayName: 'Description'
+              dataType: 'String'
+              inputType: 'textarea'
+              isRequired: false
+              isReadOnly: false
+              position: 4
+              defaultValue: ''
+              propertyOptions: []
+
+        - sectionName: 'Related Exceptions'
+          sectionPosition: 4
+          sectionContainerType: 'Table'
+          sectionProperties: []
+
+        - sectionName: 'Related Events'
+          sectionPosition: 5
+          sectionContainerType: 'Table'
+          sectionProperties: []
+
+    TemplateSectionProperty:
+      type: object
+      required:
+        - propertyName
+        - displayName
+        - dataType
+        - inputType
+        - isRequired
+        - isReadOnly
+        - position
+      description: Template section properties.
+      properties:
+        propertyName:
+          type: string
+          example: 'recommendationPriority'
+          description: Name of the property.
+        displayName:
+          type: string
+          example: 'Priority'
+          description: Label to display.
+        dataType:
+          $ref: '#/components/schemas/DataType'
+        inputType:
+          $ref: '#/components/schemas/InputType'
+        isRequired:
+          type: boolean
+          example: true
+          default: false
+          description: Value to determine if the property is a required field in the template.
+        isReadOnly:
+          type: boolean
+          example: true
+          default: false
+          description: Value to determine if the property is a read only field in the template.
+        position:
+          type: integer
+          example: 1
+          default: 1
+          description: Value that determines the order of the property.
+        defaultValue:
+          type: string
+          example: 'Draft'
+          description: Default value of the property. For instance, recommendation priority should have "Draft" as default value.
+        minimumPropertyLength:
+          type: integer
+          example: 1
+          description: Use to specify the minimum length of the property.
+        maximumPropertyLength:
+          type: integer
+          example: 100
+          description: Use to specify the maximum length of the property.
+        propertyOptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PropertyOption'
+      example:
+        - propertyName: 'recommendationAction'
+          displayName: 'Recommendation Action'
+          dataType: 'String'
+          propertyType: 'textarea'
+          isRequired: true
+          isReadOnly: false
+          position: 1
+    CommonFieldsResponse:
+      type: object
+      required:
+        - title
+        - expirationTime
+      description: The static part of the Get Recommendation response body.
+      properties:
+        title:
+          $ref: '#/components/schemas/Title'
+        expirationTime:
+          $ref: '#/components/schemas/ExpirationTime'
+        createdTime:
+          $ref: '#/components/schemas/CreatedTime'
+        updatedTime:
+          $ref: '#/components/schemas/UpdatedTime'
+        hoursReading:
+          $ref: '#/components/schemas/HoursReading'
+        site:
+          $ref: '#/components/schemas/Site'
+        owner:
+          allOf:
+            - '$ref': '#/components/schemas/User'
+          description: The user information for the owner of the recommendation.
+        createdBy:
+          allOf:
+            - '$ref': '#/components/schemas/User'
+          description: The user information for the creator of the recommendation.
+        updatedBy:
+          allOf:
+            - '$ref': '#/components/schemas/User'
+          description: The user information of who last updated the recommendation.
+        assetOwnershipAtRecommendation:
+          $ref: '#/components/schemas/AssetOwnershipAtRecommendation'
+        assetMetadata:
+          $ref: '#/components/schemas/AssetMetaData'
+
+    Recommendations:
+      description: |
+        Top level object for returning a list of recommendation. Includes response metadata with
+        pagination information.
+      type: object
+      properties:
+        recommendations:
+          type: array
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/Recommendation'
+        responseMetadata:
+          $ref: '#/components/schemas/ResponseMetadata'
+
+    Recommendation:
+      type: object
+      description: |
+        Recommendation represent a suggestion made by Customer Monitor Analyst (CMA) to the asset
+        owner. In context of the Recommendations API, an recommendation's model holds information
+        such as the status and owner of the recommendation, etc.
+      properties:
+        serialNumber:
+          $ref: '#/components/schemas/SerialNumber'
+        make:
+          $ref: '#/components/schemas/Make'
+        model:
+          $ref: '#/components/schemas/Model'
+        createdTime:
+          $ref: '#/components/schemas/CreatedTime'
+        title:
+          $ref: '#/components/schemas/Title'
+        recommendationPriority:
+          type: string
+          description: Recommendation item priority.
+          enum:
+            - '1 - Immediate Attention'
+            - '2 - At Next Stop'
+            - '3 - At Next Service'
+            - '4 - Equipment Backlog'
+            - '5 - Information/Monitor'
+          default: '3 - At Next Service'
+        recommendationStatus:
+          type: string
+          description: Current status of recommendation item.
+          enum:
+            - 'Draft'
+            - 'Published'
+            - 'Expired'
+            - 'Completed'
+          default: 'Draft'
+        expirationTime:
+          $ref: '#/components/schemas/ExpirationTime'
+        ucidName:
+          $ref: '#/components/schemas/CustomerName'
+        site:
+          $ref: '#/components/schemas/Site'
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        owner:
+          allOf:
+            - '$ref': '#/components/schemas/User'
+          description: The user information for the owner of the recommendation.
+        recommendationNumber:
+          $ref: '#/components/schemas/RecommendationNumber'
+        templateName:
+          $ref: '#/components/schemas/TemplateName'
+        workOrderId:
+          type: string
+          description: Unique identifier of a work order related to the recommendation.
+          example: T030-117279455AAKSN00209
+
+    ResponseMetadata:
+      type: object
+      description: |
+        The response metadata object contains the next cursor token for paginating the
+        result set.
+      properties:
+        nextCursor:
+          type: string
+          description: |
+            Next Cursor - string token that can be used to retrieve next query results page.
+            No value is returned if current page is the last one.
+          example: 'eyJvZmZzZXQiOjF9'
+
+    RecommendationMetadata:
+      type: object
+      required:
+        - assetId
+      description: Response of the recommendation details.
+      properties:
+        recommendationNumber:
+          $ref: '#/components/schemas/RecommendationNumber'
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        templateName:
+          $ref: '#/components/schemas/TemplateName'
+        commonFields:
+          $ref: '#/components/schemas/CommonFieldsResponse'
+        templateCustomProperties:
+          type: array
+          items:
+            $ref: '#/components/schemas/TemplateCustomFields'
+
+    RecommendationDetailsResponse:
+      type: object
+      description: Response body of the recommendation details.
+      properties:
+        recommendationMetadata:
+          $ref: '#/components/schemas/RecommendationMetadata'
+        attachments:
+          type: array
+          description: List of attachments associated with the recommendation.
+          items:
+            $ref: '#/components/schemas/Attachment'
+        links:
+          type: array
+          description: List of links associated with the recommendation.
+          items:
+            $ref: '#/components/schemas/RecommendationLink'
+        exceptions:
+          $ref: '#/components/schemas/RecommendationExceptions'
+        events:
+          $ref: '#/components/schemas/RecommendationEvents'
+      example:
+        recommendationNumber: 'REC 123-456-789'
+        assetId: 'CAT|RXZ00353|2969412354'
+        templateName: "Template1Default"
+        commonFields:
+          title: 'Apply maintenance to the asset'
+          expirationTime: '2020-03-06T17:27:04.222Z'
+          createdTime: '2020-03-06T17:27:04.222Z'
+          updatedTime: '2020-03-06T17:27:04.222Z'
+          hoursReading:
+            reading: 34.1
+            unitOfMeasure:
+              type: 'time'
+              value: 'h'
+          site: 'Asset location'
+          owner:
+            catrecid: 'AAA-98765432'
+            firstName: 'John'
+            lastName: 'Smith'
+          createdBy:
+            catrecid: 'AAA-98765432'
+            firstName: 'John'
+            lastName: 'Smith'
+          updatedBy:
+            catrecid: 'AAA-98765432'
+            firstName: 'John'
+            lastName: 'Smith'
+          assetOwnershipAtRecommendation:
+            dealerCode: 'TD00'
+            dealerName: 'Holt'
+            ucid: '25669890'
+            ucidName: 'Waste Management'
+          assetMetadata:
+            serialNumber: '2WS23456'
+            make: 'CAT'
+            model: '123AB'
+            name: 'ABC123'
+            iconUrl: 'https://services.cat.com/images/wheelloader.png'
+            productFamily:
+              code: 'mwl'
+              name: 'Medium wheel loader'
+              iconUrl: 'https://services.cat.com/images/2WS23456.png'
+        templateCustomProperties:
+          - propertyName: 'recommendationStatus'
+            propertyValue: 'Draft'
+          - propertyName: 'recommendationPriority'
+            propertyValue: '3 - At Next Service'
+          - propertyName: 'recommendationAction'
+            propertyValue: 'Information required to apply the recommendations'
+          - propertyName: 'recommendationDetails'
+            propertyValue: 'Details information that contain the recommendation'
+          - propertyName: 'valueEstimateCurrency'
+            propertyValue: 'US Dollar'
+          - propertyName: 'valueEstimateFailureCost'
+            propertyValue: '500.00'
+          - propertyName: 'valueEstimateRepairCost'
+            propertyValue: '1200.00'
+          - propertyName: 'valueEstimateRecommendationValue'
+            propertyValue: '700.00'
+          - propertyName: 'valueEstimateDescription'
+            propertyValue: 'Estimate Description value'
+        attachments:
+          - fileId: '8e84cf3d-b815-40d5-9750-1e4784fc5b75'
+            name: 'Fix issues.txt'
+            fileAttachedTime: '2020-03-06T17:27:04.222Z'
+        links:
+          - attachedTime: '2020-03-06T17:27:04.222Z'
+            url: 'https://example.com'
+        exceptions: 'https://services.cat.com/catDigital/conditionMonitoringExceptions/v1/{referenceID}'
+        events: 'https://services.cat.com/catDigital/conditionMonitoringEvents/v1/{referenceID}'
+    Attachment:
+      type: object
+      description: Attachments associated with the recommendation.
+      required:
+        - fileId
+        - name
+        - fileAttachedTime
+      properties:
+        fileId:
+          type: string
+          description: Unique identifier of the file in the storage. This fileId can be used to get file metadata and download URL.
+          example: "8e84cf3d-b815-40d5-9750-1e4784fc5b75"
+        name:
+          type: string
+          description: Name of the attachment.
+          example: "File Name"
+        fileAttachedTime:
+          $ref: '#/components/schemas/FileAttachedTime'
+    RecommendationLink:
+      type: object
+      description: Links associated with the recommendation.
+      required:
+        - attachedTime
+        - url
+      properties:
+        attachedTime:
+          $ref: '#/components/schemas/LinkAttachedTime'
+        url:
+          type: string
+          format: uri
+          description: URL of the link.
+          example: "https://example.com"
+    RecommendationExceptions:
+      type: string
+      format: uri
+      description: Recommendation Exceptions URL for retrieve the exceptions associated with the recommendation.
+      example: "https://services.cat.com/catDigital/conditionMonitoringExceptions/v1/{referenceID}"
+    RecommendationEvents:
+      type: string
+      format: uri
+      description: Recommendation Events URL for retrieve the events associated with the recommendation.
+      example: "https://services.cat.com/catDigital/conditionMonitoringEvents/v1/{referenceID}"
+    RecommendationPostRequest:
+      description: Request body to create a recommendation.
+      required:
+        - assetId
+        - templateName
+      allOf:
+        - $ref: '#/components/schemas/CommonFields'
+        - type: object
+          properties:
+            assetId:
+              $ref: '#/components/schemas/AssetId'
+            templateName:
+              $ref: '#/components/schemas/TemplateName'
+            templateCustomProperties:
+              type: array
+              items:
+                $ref: "#/components/schemas/TemplateCustomFields"
+      example:
+        assetId: "CAT|RXZ00353|2969412354"
+        templateName: "Template1Default"
+        owner:
+          catrecid: "AAA-98765432"
+        hoursReading:
+          reading: 34.10
+          unitOfMeasure: h
+        site: "Asset location"
+        title: "Draft Recommendation"
+        expirationTime: "2016-01-31T22:59:59.999Z"
+        templateCustomProperties:
+          - propertyName: 'recommendationPriority'
+            propertyValue: '3 - At Next Service'
+          - propertyName: 'recommendationAction'
+            propertyValue: 'Apply the following instruction to fix the current issues'
+
+    RecommendationPutRequest:
+      description: Request body to update a recommendation.
+      required:
+        - title
+        - expirationTime
+      allOf:
+        - $ref: '#/components/schemas/CommonFields'
+        - type: object
+          properties:
+            templateName:
+              $ref: '#/components/schemas/TemplateName'
+            templateCustomProperties:
+              type: array
+              items:
+                $ref: "#/components/schemas/TemplateCustomFields"
+      example:
+        templateName: "Default template"
+        owner:
+          catrecid: "AAA-98765432"
+        hoursReading:
+          reading: 34.10
+          unitOfMeasure: h
+        site: "Asset location"
+        title: "Draft Recommendation"
+        expirationTime: "2016-01-31T22:59:59.999Z"
+        templateCustomProperties:
+          - propertyName: 'recommendationPriority'
+            propertyValue: '3 - At Next Service'
+          - propertyName: 'recommendationAction'
+            propertyValue: 'Apply the following instruction to fix the current issues'
+          - propertyName: 'recommendationDetails'
+            propertyValue: 'This is the recommendation details that we'
+          - propertyName: 'valueEstimateCurrency'
+            propertyValue: 'USD'
+          - propertyName: 'valueEstimateFailureCost'
+            propertyValue: '500.00'
+          - propertyName: 'valueEstimateRepairCost'
+            propertyValue: '300.00'
+          - propertyName: 'valueEstimateRecommendationValue'
+            propertyValue: '800.00'
+          - propertyName: 'valueEstimateDescription'
+            propertyValue: 'Estimate Description value'
+    RecommendationPublishRequest:
+      type: object
+      required:
+        - recipients
+        - subject
+        - sendCopyToSender
+      description: Request body to publish/send a recommendation.
+      properties:
+        recipients:
+          type: object
+          description: Recipients for the recommendation. Allow multiple email address. At least one (to) recipient is required.
+          required:
+            - to
+          properties:
+            to:
+              type: array
+              items:
+                type: string
+                example: "user.name@email.com"
+              minItems: 1
+              example:
+                - user.name@email.com
+                - userto.name@email.com
+            cc:
+              type: array
+              items:
+                type: string
+                example: "user.name2@email.com"
+              example:
+                - user.name2@email.com
+            bcc:
+              type: array
+              items:
+                type: string
+                example: "user.name3@email.com"
+              example:
+                - user.name3@email.com
+        subject:
+          type: string
+          description: Subject for the recommendation.
+          example: Title of recommendation
+          minLength: 10
+          maxLength: 200
+        message:
+          type: string
+          description: Email content for the recommendation.
+          example: Dealer please apply the recommendation actions added in the PDF file
+          minLength: 0
+          maxLength: 2000
+
+        sendCopyToSender:
+          type: boolean
+          description: True - Indicates the sender want to have a copy of email.
+          default: true
+          example: true
+    FileMetadata:
+      type: object
+      required:
+        - fileName
+        - url
+        - status
+      description: Metadata of attachments files from recommendations.
+      properties:
+        fileName:
+          type: string
+          description: File name of attachment for recommendation.
+          example: report.xls
+        contentLength:
+          type: integer
+          description: Actual content size of file. File length in bytes.
+          example: 1500
+        url:
+          type: string
+          format: uri
+          description: File URL of the attachment.
+          example: https://domain.com/fileName
+        status:
+          $ref: '#/components/schemas/Status'
+
+        isIncludedInEmail:
+          type: boolean
+          description: Flag to indicate that file will be included in the recommendation email when published.
+          default: false
+          example: false
+
+    MetadataResponse:
+      type: object
+      required:
+        - recommendationNumber
+      description: Response of the recommendation metadata.
+      properties:
+        recommendationNumber:
+          $ref: '#/components/schemas/RecommendationNumber'
+        totalAttachmentSize:
+          type: number
+          example: 10.5
+          description: The current attachments size for existing recommendations.
+        unitOfMeasure:
+          $ref: '#/components/schemas/StorageUoM'
+        files:
+          type: array
+          maxItems: 25
+          items:
+            $ref: '#/components/schemas/FileMetadata'
+      example:
+        recommendationNumber: "REC 123-456-789"
+        totalAttachmentSize: 10.5
+        unitOfMeasure: MB
+        files:
+          - fileName: "Report.xls"
+            contentLenght: 1500
+            status: "uploaded"
+            isIncludedInEmail: true
+            url: https://domain.com/fileName
+          - fileName: "Actions.pdf"
+            contentLenght: 1000
+            status: "uploaded"
+            isIncludedInEmail: false
+            url: https://domain.com/fileName2
+    TemplateProperties:
+      type: object
+      required:
+        - sectionName
+        - sectionPosition
+        - sectionContainerType
+      description: Template properties information.
+      properties:
+        sectionName:
+          type: string
+          example: 'Value Estimate'
+          description: Name of the section in the template definition.
+        sectionPosition:
+          type: integer
+          example: 1
+          description: Position identifier of section in the template definition.
+        sectionContainerType:
+          $ref: '#/components/schemas/ContainerType'
+        sectionProperties:
+          type: array
+          items:
+            "$ref": "#/components/schemas/TemplateSectionProperty"
+    AdditionalInfo:
+      description: Represents technical details about the error with additional message.
+      properties:
+        subCode:
+          type: string
+          example: '400.006'
+          description: Error code sent by API for each validation.
+        field:
+          type: string
+          example: 'assetId'
+          description: Each exact property field that was validated.
+        message:
+          type: string
+          example: 'AssetId is required field.'
+          description: Each error message on the property-level validation done by the API.
+
+    Error:
+      type: object
+      description: |
+        Represents an error code, description, and detailed error message for a given endpoint.
+        Every HTTP status code returns a different `code` value in the response based on the nature
+        of the error that occurred.
+        Also, one HTTP status code can return different `code` for different use cases.
+        The below table shows mapping of different `Code`, 'HTTP Error Message' and `Description`
+        for each HTTP status code. HTTP 405 error will be thrown when incorrect HTTP method is used
+        for any endpoint.
+
+        | **HTTP Status Code** | **Code** | **HTTP Error Message** | **Description** |
+        | ------------- |:-------------:|-------------:|-------------:|
+        | `400` | `400.001` | Bad Request | Unknown error occurred. |
+        | `400` | `400.002` | Bad Request | Threat detected: maximum allowed limit of request is exceeded. |
+        | `400` | `400.006` | Bad Request | Missing required field(s). |
+        | `400` | `400.008` | Bad Request | Invalid or missing request body. |
+        | `400` | `400.009` | Bad Request | Body not allowed. |
+        | `400` | `400.010` | Bad Request | XML schema is not valid. |
+        | `401` | `401.001` | Unauthorized | Invalid access token. |
+        | `401` | `401.002` | Unauthorized | Access token expired. |
+        | `401` | `401.003` | Unauthorized | API product mismatch for token. |
+        | `401` | `401.004` | Unauthorized | Insufficient scope for application. |
+        | `401` | `401.005` | Unauthorized | Invalid API key for given resource. |
+        | `401` | `401.006` | Unauthorized | Missing access token. |
+        | `401` | `401.007` | Unauthorized | Invalid or expired access token. |
+        | `401` | `401.008` | Unauthorized | User not authorized. |
+        | `403` | `403.001` | Forbidden | Request not coming from valid IP. |
+        | `403` | `403.002` | Forbidden | There was an error getting entitlements. |
+        | `403` | `403.003` | Forbidden | ClientId: <ClientId> does not have permission for: <http method> <ResourceURL>.|
+        | `404` | `404.001` | Not Found | Resource not found. |
+        | `405` | `405.001` | Method Not Allowed | Method not allowed. |
+        | `406` | `406.001` | Not Acceptable | Request not acceptable. The target resource does not have a current representation that would be acceptable to the user agent. |
+        | `409` | `409.001` | Conflict | Request conflicts with current state. |
+        | `413` | `413.001` | Payload Too Large | Payload too large. |
+        | `415` | `415.001` | Unsupported Media Type | Unsupported media type. Requested payload format is not supported by this method on the target resource. The format problem might be due to the request's indicated content-type or content-encoding, or as a result of inspecting the data directly. |
+        | `429` | `429.001` | Too Many Requests | Throttling rate limit exceeded. |
+        | `429` | `429.002` | Too Many Requests | Quota rate limit exceeded. |
+        | `500` | `500.001` | Internal Server Error | Server error. |
+        | `500` | `500.002` | Internal Server Error | Shared flow not found. |
+        | `500` | `500.003` | Internal Server Error | Script execution failed. |
+        | `500` | `500.004` | Internal Server Error | Error occurred while getting response from backend. Please try later. |
+        | `500` | `500.005` | Internal Server Error | Missing mandatory configuration properties. |
+        | `500` | `500.006` | Internal Server Error | Unable to AssumeRole for authentication. |
+        | `503` | `503.001` | Service Unavailable | The service is temporarily unavailable. |
+        | `504` | `504.001` | Gateway Timeout | Request timed out. |
+
+      ###Please add the backend error code in the above table. Don't use above error codes (reserved for Apigee) as backend error ###
+      properties:
+        code:
+          type: string
+          description: Error Code represents an alpha-numeric error code received from the error.
+          example: '403'
+        description:
+          type: string
+          description: Message represents a textual description of a given error code.
+          example: 'Forbidden User'
+        ##This is optional. If you need to send additional error/warning messages, you can populate this section with corresponding errors.
+        details:
+          type: array
+          description: Optional technical details about the error/warning with additional message.
+          items:
+            $ref: '#/components/schemas/AdditionalInfo'
+      required:
+        - code
+        - description
+
+    FiltersAndResponseAttributesRequest:
+      description: |
+        List of search criteria to filter recommendations and response attribute information.
+      allOf:
+        - $ref: '#/components/schemas/Filters'
+        - type: object
+          properties:
+            responseAttributes:
+              $ref: '#/components/schemas/ResponseAttributes'
+      example:
+        logicalExpression: '$0 & $1 & $2 & $3 & $4 & $5 & $6 & $7 & $8 & $9 & $10 & $11 & $12 & $13'
+        filters:
+          - propertyName: serialNumber
+            type: contains
+            value: abc00123
+          - propertyName: title
+            type: contains
+            value: reco for asset abc00123
+          - propertyName: site
+            type: contains
+            value: Mining Site
+          - propertyName: assetId
+            type: contains
+            value: 'CAT|88101493|2969631034'
+          - propertyName: ucidName
+            type: contains
+            value: 'Waste Management'
+          - propertyName: creatorName
+            type: contains
+            value: Smith
+          - propertyName: ownerName
+            type: contains
+            value: Bob Clark
+          - propertyName: workOrderId
+            type: stringEquals
+            values:
+              - 'T030-117279455AAKSN00209'
+          - propertyName: numberOfDaysSinceModified
+            type: integerEquals
+            values: [14]
+          - propertyName: recommendationStatus
+            type: stringEquals
+            values:
+              - 'Draft'
+              - 'Published'
+              - 'Expired'
+              - 'Completed'
+          - propertyName: recommendationPriority
+            type: stringEquals
+            values:
+              - '1 - Immediate Attention'
+              - '2 - At Next Stop'
+              - '3 - At Next Service'
+              - '4 - Equipment Backlog'
+              - '5 - Information/Monitor'
+          - propertyName: recommendationNumber
+            type: stringEquals
+            values:
+              - 'REC 121-456-789'
+              - 'REC 122-456-789'
+              - 'REC 123-456-789'
+              - 'REC 124-456-789'
+          - propertyName: expirationTime
+            type: timeRange
+            range:
+              left: '2019-01-01T09:00:00.000+00:00'
+              right: '2020-12-31T23:59:59.999+00:00'
+              includeLeft: true
+              includeRight: false
+          - propertyName: createdTime
+            type: timeRange
+            range:
+              left: '2019-01-01T09:00:00.000+00:00'
+              right: '2020-12-31T23:59:59.999+00:00'
+              includeLeft: true
+              includeRight: false
+
+        responseAttributes: [ serialNumber, make, model, title, recommendationPriority, recommendationStatus, createdTime, expirationTime, ucidName, site, assetId, owner, recommendationNumber, templateName, workOrderId ]
+
+    ResponseAttributes:
+      type: array
+      description: |
+        List of top-level response attributes (columns) to include in the response for each Recommendation.
+        This list consists of top-level schemas included in the `Recommendation` object. For example, if
+        an attribute such as `ucidName` is included in this list, all attributes within the `ucidName`
+        schema in Recommendations will be returned. Likewise, if `ucidName`is excluded from the response, the
+        response will not include any info under the `ucidName` schema in `Recommendation`.
+
+        If the list is null or empty, the default behavior will be to return all attributes.
+      items:
+        type: string
+        enum:
+          - 'serialNumber'
+          - 'make'
+          - 'model'
+          - 'createdTime'
+          - 'title'
+          - 'recommendationPriority'
+          - 'recommendationStatus'
+          - 'expirationTime'
+          - 'ucidName'
+          - 'site'
+          - 'assetId'
+          - 'owner'
+          - 'recommendationNumber'
+          - 'templateName'
+          - 'workOrderId'
+      example: [ 'serialNumber', 'make', 'model', 'createdTime', 'title', 'recommendationPriority', 'recommendationStatus', 'expirationTime', 'ucidName', 'site', 'assetId', 'owner', 'recommendationNumber', 'templateName', 'workOrderId' ]
+
+    Filters:
+      type: object
+      description: |
+        Defines filtering criteria. Filtering criteria are formed by filters of
+        various types (equals, contains, time range) combined together in a
+        logical expression.
+        If expression is not provided, each filter will be combined with others
+        using `&` (AND) operator.
+
+        Query will fail if:
+          * logical expression is malformed (see details in logical expression
+            description)
+          * type of a filter does not apply to a type of a field. (for example:
+            time range filter cannot be applied to string field)
+
+      properties:
+        logicalExpression:
+          type: string
+          description: |
+            Logical expression defines how filters are combined together.
+            Expression grammar supports following elements:
+             * `$1` - variable, defines which filter to take from the list of
+               provided filters (counting from 0)
+             * `&`, `|`, and `!` - logical operators AND, OR and NOT
+             * `(` and `)` - braces to form more complex expressions
+
+            Logical operator precedence: `!`, `&`, `|`, i.e., the NOT operator
+            takes precedence.
+
+            Expression is evaluated from left to right.
+
+            It is possible to repeat same variable in expression multiple times.
+            If expression is not provided, each filter will be concatenated with
+            others using `&` (AND) operator.
+
+            Query will fail if:
+             * expression is malformed (not allowed symbols, unbalanced braces
+               and etc.)
+             * number of filters does not correspond to number of variables in
+               expression
+
+            Other limitations:
+              * collection of filters can only have ONE geospatial filter.
+
+          example: '$0 & $1 & $2 & $3'
+        filters:
+          type: array
+          maxItems: 14
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/StringEqualsFilter'
+              - $ref: '#/components/schemas/ContainsFilter'
+              - $ref: '#/components/schemas/TimeRangeFilter'
+              - $ref: '#/components/schemas/IntegerEqualsFilter'
+      example:
+        logicalExpression: '$0 & $1 & $2 & $3'
+        filters:
+          - propertyName: serialNumber
+            type: contains
+            value: abc00123
+          - propertyName: recommendationStatus
+            type: stringEquals
+            values: [ 'Draft', 'Published', 'Expired', 'Completed' ]
+          - propertyName: createdTime
+            type: timeRange
+            range:
+              left: '2019-01-01T09:00:00.000+00:00'
+              right: '2020-12-31T23:59:59.999+00:00'
+              includeLeft: true
+              includeRight: false
+          - propertyName: numberOfDaysSinceModified
+            type: integerEquals
+            values: [14]
+
+    TimeRangeFilter:
+      description: |
+        Allows to filter date values within a certain range. See range models for
+        more info about boundary inclusion rules.
+      required:
+        - range
+      allOf:
+        - $ref: '#/components/schemas/FilterBase'
+        - type: object
+          properties:
+            range:
+              $ref: '#/components/schemas/TimeRange'
+      example:
+        type: timeRange
+        propertyName: expirationTime
+        range:
+          left: '2019-01-01T09:00:00.000+00:00'
+          right: '2020-12-31T23:59:59.999+00:00'
+          includeLeft: true
+          includeRight: false
+
+    IntegerEqualsFilter:
+      description: |
+        Represents a single filtering criteria, i.e. name of the object field to
+        filter by and list of possible values. This filter will select a row
+        only in case of match with one of the values in the provided list.
+      required:
+        - values
+      allOf:
+        - $ref: '#/components/schemas/NumericFilterBase'
+        - type: object
+          properties:
+            values:
+              type: array
+              description: Array of possible filter values.
+              items:
+                type: integer
+                format: int64
+              minItems: 1
+              example: [ 10, 14 ]
+      example:
+        type: integerEquals
+        propertyName: numberOfDaysSinceModified
+        values: [ 124 ]
+
+    NumericFilterBase:
+      description: |
+        Base model for all filters that deal with numeric values.
+      allOf:
+        - $ref: '#/components/schemas/FilterBase'
+
+    TimeRange:
+      description: |
+        Range is defined by 'left' and 'right' parameters. If one of the boundaries is omitted
+        or null, it will be assumed that range is open bounded (infinity on that side).
+        In addition, two boolean flags indicate whether boundaries are included in the range.
+        Also 'left' should always be less than or equal to 'right'.
+      allOf:
+        - $ref: '#/components/schemas/RangeBase'
+        - type: object
+          properties:
+            left:
+              $ref: '#/components/schemas/DateTime'
+            right:
+              $ref: '#/components/schemas/DateTime'
+      example:
+        left: '2019-01-01T09:00:00.000+00:00'
+        right: '2020-12-31T23:59:59.999+00:00'
+        includeLeft: true
+        includeRight: false
+
+    StringEqualsFilter:
+      description: |
+        Represents a single filtering criteria, i.e., the name of the object field
+        to filter by and list of possible values. This filter will only select a row
+        in case of exact match with one of the values in the provided list.
+      required:
+        - values
+      allOf:
+        - $ref: '#/components/schemas/FilterBase'
+        - type: object
+          properties:
+            values:
+              type: array
+              description: Array of possible filter values.
+              items:
+                type: string
+                minItems: 1
+              example: [ 415F2, AP255E ]
+            isCaseSensitive:
+              description: Defines whether string comparison is case-sensitive.
+              type: boolean
+              default: false
+              example: true
+      example:
+        type: stringEquals
+        propertyName: recommendationStatus
+        isCaseSensitive: true
+        values: [ 'Draft', 'Published', 'Expired', 'Completed' ]
+
+    ContainsFilter:
+      description: Filter will find all filterValues that contain given search string.
+      allOf:
+        - $ref: '#/components/schemas/StringFilterBase'
+      example:
+        type: contains
+        propertyName: serialNumber
+        isCaseSensitive: false
+        value: abc00123
+
+    StringFilterBase:
+      description: Base model for string matching filters.
+      required:
+        - value
+      allOf:
+        - $ref: '#/components/schemas/FilterBase'
+        - type: object
+          properties:
+            value:
+              description: Search string.
+              type: string
+              minLength: 1
+              example: 'a'
+            isCaseSensitive:
+              description: Defines whether string comparison is case sensitive.
+              type: boolean
+              default: false
+              example: false
+
+    FilterBase:
+      type: object
+      description: Base model for all filter types.
+      required:
+        - type
+        - propertyName
+      properties:
+        type:
+          $ref: '#/components/schemas/FilterType'
+        propertyName:
+          $ref: '#/components/schemas/RecommendationPropertiesForFiltering'
+
+    FilterType:
+      type: string
+      description: Enum that defines all possible filter types.
+      enum:
+        - 'contains'
+        - 'stringEquals'
+        - 'timeRange'
+
+    RecommendationPropertiesForFiltering:
+      type: string
+      description: |
+        Recommendation properties that can be used for filtering. Filtering of recommendation will be performed on
+        the repository layer so when filtered by `creatorName` and `ownerName`, where the SQl operator `LIKE` will be
+        used to find any combination of the name. The `numberOfDaysSinceModified` will also be used to filter recommendations;
+        the value signifies when was the last time the recommendation was updated so that the CMA's can follow-up. The field
+        `numberOfDaysSinceModified` is referring to the number of days since there was any activity/update to the recommendations.
+      enum:
+        - 'expirationTime'
+        - 'createdTime'
+        - 'serialNumber'
+        - 'title'
+        - 'site'
+        - 'assetId'
+        - 'ucidName'
+        - 'creatorName'
+        - 'ownerName'
+        - 'recommendationStatus'
+        - 'recommendationPriority'
+        - 'recommendationNumber'
+        - 'workOrderId'
+        - 'numberOfDaysSinceModified'
+
+    RangeBase:
+      type: object
+      description: Base for defining range input models.
+      properties:
+        includeLeft:
+          description: Indicates whether left boundary of the range should be included.
+          type: boolean
+          default: true
+        includeRight:
+          description: Indicates whether right boundary of the range should be included.
+          type: boolean
+          default: true
+
+  responses:
+
+    204NoContent:
+      description: No Content
+      headers:
+        X-Cat-API-Tracking-Id:
+          $ref: '#/components/headers/X-Cat-API-Tracking-Id'
+    StatisticsResponse:
+      description: Successful Response
+      headers:
+        X-Cat-API-Tracking-Id:
+          $ref: '#/components/headers/X-Cat-API-Tracking-Id'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MetadataResponse'
+    TemplateListResponse:
+      description: Successful Response
+      headers:
+        X-Cat-API-Tracking-Id:
+          $ref: '#/components/headers/X-Cat-API-Tracking-Id'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/TemplateListResponse'
+    TemplatePropertiesResponse:
+      description: Successful Response
+      headers:
+        X-Cat-API-Tracking-Id:
+          $ref: '#/components/headers/X-Cat-API-Tracking-Id'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/TemplatePropertiesList'
+    400BadRequest:
+      description: Bad Request
+      headers:
+        X-Cat-API-Tracking-Id:
+          $ref: '#/components/headers/X-Cat-API-Tracking-Id'
+      content:
+        application/json:
+          example:
+            code: "400.006"
+            description: "Missing required field(s)."
+            details:
+              - subCode: "400.006"
+                field: "assetId"
+                message: "AssetId is required field."
+              - subCode: "400.006"
+                field: "templateName"
+                message: "Template is required field."
+          schema:
+            $ref: "#/components/schemas/Error"
+    401Unauthorized:
+      description: Unauthorized
+      headers:
+        X-Cat-API-Tracking-Id:
+          $ref: '#/components/headers/X-Cat-API-Tracking-Id'
+      content:
+        application/json:
+          example:
+            code: "401.006"
+            description: "Missing Authorization header or token value."
+          schema:
+            $ref: "#/components/schemas/Error"
+    403Forbidden:
+      description: Forbidden
+      headers:
+        X-Cat-API-Tracking-Id:
+          $ref: '#/components/headers/X-Cat-API-Tracking-Id'
+      content:
+        application/json:
+          example:
+            code: "403.001"
+            description: Forbidden
+          schema:
+            $ref: "#/components/schemas/Error"
+    404NotFound:
+      description: Not Found
+      headers:
+        X-Cat-API-Tracking-Id:
+          $ref: '#/components/headers/X-Cat-API-Tracking-Id'
+      content:
+        application/json:
+          example:
+            code: "404.001"
+            description: Resource Not Found
+          schema:
+            $ref: "#/components/schemas/Error"
+    406RequestNotAcceptable:
+      description: Request Not Acceptable
+      headers:
+        X-Cat-API-Tracking-Id:
+          $ref: '#/components/headers/X-Cat-API-Tracking-Id'
+      content:
+        application/json:
+          example:
+            code: "406.001"
+            description: Request not acceptable
+          schema:
+            $ref: "#/components/schemas/Error"
+    413PayloadTooLarge:
+      description: Request payload is too large
+      headers:
+        X-Cat-API-Tracking-Id:
+          $ref: '#/components/headers/X-Cat-API-Tracking-Id'
+      content:
+        application/json:
+          example:
+            code: "413.001"
+            description: "Request payload is too large"
+          schema:
+            $ref: "#/components/schemas/Error"
+    415UnsupportedMediaType:
+      description: Unsupported Media Type
+      headers:
+        X-Cat-API-Tracking-Id:
+          $ref: '#/components/headers/X-Cat-API-Tracking-Id'
+      content:
+        application/json:
+          example:
+            code: "415.001"
+            description: Requested payload format is not supported by this method on the target resource. The format problem might be due to the request's indicated Content-Type or Content-Encoding, or as a result of inspecting the data directly.
+          schema:
+            $ref: "#/components/schemas/Error"
+    429TooManyRequest:
+      description: Too Many Requests.
+      headers:
+        X-Cat-API-Tracking-Id:
+          $ref: '#/components/headers/X-Cat-API-Tracking-Id'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: '429.001'
+            description: Too many requests.
+    500InternalServerError:
+      description: Internal Server Error.
+      headers:
+        X-Cat-API-Tracking-Id:
+          $ref: '#/components/headers/X-Cat-API-Tracking-Id'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: '500.001'
+            description: Internal Server Error.
+    503ServiceUnavailable:
+      description: Service Unavailable.
+      headers:
+        X-Cat-API-Tracking-Id:
+          $ref: '#/components/headers/X-Cat-API-Tracking-Id'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: '503.001'
+            description: Service unavailable.
+  parameters:
+    recommendationNumber:
+      name: recommendationNumber
+      in: path
+      required: true
+      description: Unique Identifier of recommendation.
+      explode: false
+      schema:
+        $ref: '#/components/schemas/RecommendationNumber'
+    templateName:
+      name: templateName
+      in: path
+      required: true
+      description: Unique Name of Recommendation Template.
+      explode: false
+      schema:
+        $ref: '#/components/schemas/TemplateName'
+    X-Cat-API-Tracking-Id:
+      name: X-Cat-API-Tracking-Id
+      in: header
+      description: A unique ID generated for each request.
+      required: false
+      schema:
+        type: string
+        format: uuid
+      example: '33aa372a-a4e4-11ea-bb37-0242ac130002'
+    X-Cat-User-Preferences:
+      name: X-Cat-User-Preferences
+      in: header
+      description: |
+        Global user preferences for formatting the API response. You can get the
+        preferences for the user with Cat Digital User Preferences API. The
+        value must be passed in as a base64-encoded string.
+      required: false
+      schema:
+        type: string
+        format: byte
+        example: ewogICAgICAgICJ1c2VyUHJvdmlkZWQiOiB7CiAgICAgICAgICAgICJhc3NldExhYmVsIjogImFzc2V0SWQiLAogICAgICAgICAgICAiYXNzZXRMb2NhdGlvbkxhYmVsIjogImxhdExvbiIKICAgICAgICB9LAogICAgICAgICJkZWZhdWx0cyI6IHsKICAgICAgICAgICAgImFzc2V0TGFiZWwiOiAiYXNzZXRJZCIsCiAgICAgICAgICAgICJhc3NldExvY2F0aW9uTGFiZWwiOiAiYWRkcmVzcyIsCiAgICAgICAgICAgICJsYW5ndWFnZSI6ICJlbiIsCiAgICAgICAgICAgICJ0aW1lem9uZSI6ICJVVEMiLAogICAgICAgICAgICAidGltZUZvcm1hdCI6ICJob3VyczI0IiwKICAgICAgICAgICAgImRhdGVGb3JtYXQiOiAiZGRtbXl5eXkiLAogICAgICAgICAgICAibnVtYmVyRm9ybWF0IjogInJhZGl4Q29tYSIsCiAgICAgICAgICAgICJzeXN0ZW1PZk1lYXN1cmVtZW50IjogIm1ldHJpYyIsCiAgICAgICAgICAgICJ0ZW1wZXJhdHVyZVVuaXQiOiAiY2Vsc2l1cyIsCiAgICAgICAgICAgICJwcmVzc3VyZVVuaXQiOiAicHNpIgogICAgICAgIH0KICAgIH0= # encoded string
+
+    sortBy:
+      name: sortBy
+      in: query
+      description: |
+        Sort the results by selected value, values should be unique, case-sensitive.
+        The field numberOfDaysSinceModified` is referring to the number of days
+        since there was any activity/update to the recommendations.
+      explode: false
+      required: false
+      schema:
+        type: array
+        maxItems: 3
+        items:
+          type: string
+          enum:
+            - 'serialNumber'
+            - 'make'
+            - 'model'
+            - 'createdTime'
+            - 'title'
+            - 'recommendationPriority'
+            - 'recommendationStatus'
+            - 'expirationTime'
+            - 'ucidName'
+            - 'site'
+            - 'assetId'
+            - 'owner'
+            - 'recommendationNumber'
+            - 'templateName'
+            - 'workOrderId'
+            - 'numberOfDaysSinceModified'
+          default: 'serialNumber'
+
+    orderBy:
+      name: orderBy
+      in: query
+      description: |
+        Return results in the specified order. This is typically either ascending or descending.
+        **Note:** Number of 'sortBy' entries should match number of orderBy entries (1:1 correspondence).
+      explode: false
+      schema:
+        type: array
+        maxItems: 3
+        items:
+          type: string
+          enum:
+            - 'ASC'
+            - 'DESC'
+          default: 'DESC'
+      required: false
+
+    cursor:
+      name: cursor
+      in: query
+      description: |
+        String token that can be used to retrieve next query results page. Skip this parameter
+        to load the first page.
+      schema:
+        type: string
+      example: 23da034e-a4e3-11ea-bb37-0242ac130002
+      required: false
+
+    limit:
+      name: limit
+      in: query
+      description: Number of records to return in a single page.
+      schema:
+        type: integer
+        default: 25
+        minimum: 1
+        maximum: 1000
+
+    skip:
+      name: skip
+      in: query
+      description: |
+        Number of records to skip before returning the next page. In case cursor is provided
+        records will be skipped starting from that cursor position.
+      schema:
+        type: integer
+        default: 0
+        minimum: 0
+        maximum: 100000
+      example: 10
+      required: false
+
+    recommendationSearchValue:
+      name: searchValue
+      description: |
+        Additional filter parameter to refine the search based on the following recommendations properties.
+        - Serial Number
+        - Asset ID
+        - Recommendation Title
+        - Recommendation Number
+        - Customer Name
+        - Site Name
+        - Creator Name
+        - Owner Name
+      in: query
+      required: false
+      example: Mining Site
+      explode: false
+      schema:
+        type: string
+        minLength: 3
+
+  securitySchemes:
+    catFedLogin:
+      type: oauth2
+      description: Authentication using Cat FedLogin and the OAuth 2.0 framework.
+      flows:
+        implicit:
+          authorizationUrl: https://fedlogin.cat.com/as/authorization.oauth2?pfidpadapterid=OAuthAdapterCCDS
+          scopes: {}
+        authorizationCode:
+          authorizationUrl: https://fedlogin.cat.com/as/authorization.oauth2?pfidpadapterid=OAuthAdapterCCDS
+          tokenUrl: https://fedlogin.cat.com/as/token.oauth2?pfidpadapterid=OAuthAdapterCCDS
+          refreshUrl: https://fedlogin.cat.com/as/token.oauth2?pfidpadapterid=OAuthAdapterCCDS
+          scopes: {}
+        clientCredentials:
+          tokenUrl: https://fedlogin.cat.com/as/token.oauth2?pfidpadapterid=OAuthAdapterCCDS
+          scopes: {}
+    api_key:
+      type: "apiKey"
+      name: "x-api-key"
+      in: "header"

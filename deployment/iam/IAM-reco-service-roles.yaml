@@ -1,0 +1,201 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Required roles for Recommendation service"
+
+Parameters:
+  EnvironmentSuffix:
+    Type: String
+    AllowedValues:
+      - "dev"
+      - "int"
+      - "prod"
+  RolePrefix:
+    Type: String
+    Default: "pbr-pfm"
+  ProjectName:
+    Type: String
+    Default: "reco"
+  ResourcePrefix:
+    Type: String
+    Default: "pfm-reco"
+  RoleName:
+    Type: String
+    Default: "pfm-reco-ecs-role"
+  CentralLoggingStreamName:
+    Type: String
+    Default: "platform-avengers-cat_digital_centralized_fluentd-es-kin"
+
+Resources:
+  pfmRECOServiceECSRole:
+    Type: "AWS::IAM::Role"
+    Description: "Allows ECS tasks to call AWS services on your behalf."
+    Properties:
+      RoleName: !Sub "${RolePrefix}-${ProjectName}-ecs-execution-role-${EnvironmentSuffix}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          Effect: "Allow"
+          Principal:
+            Service:
+              - "ecs-tasks.amazonaws.com"
+              - "ecs.amazonaws.com"
+              - "application-autoscaling.amazonaws.com"
+          Action: "sts:AssumeRole"
+      PermissionsBoundary: !Sub arn:aws:iam::${AWS::AccountId}:policy/PermissionBoundary
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+        - "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole"
+  CustomPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: !Sub "${RolePrefix}-${ProjectName}-ecs-execution-role-policy-${EnvironmentSuffix}"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: CloudwatchFullAccessForRECO
+            Effect: "Allow"
+            Action:
+              - "cloudwatch:*"
+            Resource:
+              - !Sub "arn:aws:cloudwatch::${AWS::AccountId}:dashboard/${ResourcePrefix}-*"
+              - !Sub "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:${ResourcePrefix}-*"
+          - Effect: Allow
+            Action: cloudwatch:PutMetricData
+            Resource: "*"
+          - Sid: EventsAccessForRECO
+            Effect: "Allow"
+            Action:
+              - "events:PutEvents"
+              - "events:EnableRule"
+              - "events:DisableRule"
+            Resource:
+              - !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/${ResourcePrefix}-*"
+
+          - Sid: CentralizedKinesisAccess
+            Effect: "Allow"
+            Action:
+              - "kinesis:PutRecord"
+              - "kinesis:PutRecords"
+            Resource:
+              - !Sub "arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/${CentralLoggingStreamName}"
+          - Sid: DBSecretAccess
+            Effect: "Allow"
+            Action:
+              - "secretsmanager:GetSecretValue"
+            Resource:
+              - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ResourcePrefix}-*"
+
+          - Sid: LogAccess
+            Effect: "Allow"
+            Action:
+              - "logs:Describe*"
+              - "logs:StopQuery"
+              - "logs:TestMetricFilter"
+              - "logs:ListLogDeliveries"
+              - "logs:PutResourcePolicy"
+              - "logs:GetQueryResults"
+              - "logs:UpdateLogDelivery"
+              - "logs:CancelExportTask"
+              - "logs:PutDestination"
+            Resource:
+              - "*"
+          - Sid: All
+            Effect: "Allow"
+            Action:
+              - "application-autoscaling:*"
+              - "ecr:GetAuthorizationToken"
+              - "ecs:UpdateService"
+              - "ecs:DescribeServices"
+            Resource:
+              - "*"
+          - Sid: SSMReadAccessForRECO
+            Effect: "Allow"
+            Action:
+              - "ssm:GetParameter"
+            Resource:
+              - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/platform-encryption-certificate*"
+              - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/platform-encryption-certificate*/*"
+          - Sid: KMSAccessForRECO
+            Effect: "Allow"
+            Action:
+              - "kms:Encrypt"
+              - "kms:Decrypt"
+            Resource:
+              - !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/*"
+          - Sid: S3Access
+            Effect: "Allow"
+            Action:
+              - "s3:PutObject"
+              - "s3:GetBucketAcl"
+              - "s3:DeleteObject"
+              - "s3:GetObject"
+              - "s3:ListBucket"
+            Resource:
+              - "arn:aws:s3:::${ResourcePrefix}-*"
+              - "arn:aws:s3:::${ResourcePrefix}-*/*"
+          - Sid: LogsAccessLocked
+            Effect: "Allow"
+            Action:
+              - "logs:ListTagsLogGroup"
+              - "logs:DeleteSubscriptionFilter"
+              - "logs:DescribeLogStreams"
+              - "logs:DescribeSubscriptionFilters"
+              - "logs:StartQuery"
+              - "logs:DescribeMetricFilters"
+              - "logs:DeleteLogStream"
+              - "logs:CreateExportTask"
+              - "logs:CreateLogStream"
+              - "logs:DeleteMetricFilter"
+              - "logs:TagLogGroup"
+              - "logs:DeleteRetentionPolicy"
+              - "logs:GetLogEvents"
+              - "logs:AssociateKmsKey"
+              - "logs:FilterLogEvents"
+              - "logs:DisassociateKmsKey"
+              - "logs:DescribeLogGroups"
+              - "logs:UntagLogGroup"
+              - "logs:DeleteLogGroup"
+              - "logs:PutLogEvents"
+              - "logs:PutMetricFilter"
+              - "logs:PutSubscriptionFilter"
+              - "logs:PutRetentionPolicy"
+              - "logs:GetLogGroupFields"
+              - "cloudwatch:DescribeAlarmHistory"
+              - "cloudwatch:DescribeAlarms"
+              - "cloudwatch:GetMetricStatistics"
+              - "cloudwatch:ListMetrics"
+            Resource:
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group::${ResourcePrefix}-*:*"
+              - "arn:aws:logs:::log-group::logfluentcollector*:*"
+              - "arn:aws:logs:::log-group:/aws/ecs/*"
+              - "arn:aws:cloudwatch:*:*:alarm:*"
+      Roles:
+        - Ref: pfmRECOServiceECSRole
+
+  pfmRECOKibanaNotificationRole:
+    Type: "AWS::IAM::Role"
+    Description: "Allows kibana to publish message to SNS."
+    Properties:
+      RoleName: !Sub "${RolePrefix}-${ProjectName}-kibana-sns-access-role-${EnvironmentSuffix}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          Effect: "Allow"
+          Principal:
+            Service:
+              - "es.amazonaws.com"
+          Action:
+            - "sts:AssumeRole"
+      PermissionsBoundary: !Sub arn:aws:iam::${AWS::AccountId}:policy/PermissionBoundary
+      Policies:
+        - PolicyName: !Sub "${RolePrefix}-${ProjectName}-kibana-sns-access-role-policy-${EnvironmentSuffix}"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              Effect: "Allow"
+              Action: "sns:Publish"
+              Resource: !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${ResourcePrefix}-*"
+
+
+
+
+

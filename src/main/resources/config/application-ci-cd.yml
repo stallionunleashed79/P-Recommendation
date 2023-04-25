@@ -1,0 +1,86 @@
+server:
+  port: 8080
+
+#Use this profile if you are running the app locally and have mysql already running on localhost:3306
+logging:
+  level:
+    root: INFO
+    com.cat: DEBUG
+
+env:
+  local: false
+
+# Spring data source
+spring:
+  flyway:
+    enable: true
+    cleanOnValidationError: true
+    baseline-on-migrate: true
+  jpa:
+    hibernate:
+      ddl-auto: none
+  datasource:
+    url: jdbc:postgresql://postgresdb:5432/reco
+    username: postgres
+
+# Spring Actuator
+management:
+  endpoints:
+    enabled-by-default: false
+    web.exposure.include: "*"
+  endpoint:
+    health.enabled: true
+    metrics.enabled: true
+    info.enabled: true
+
+client:
+  user:
+    management:
+      url: https://services-qa.cat.com/catDigital/userManagement/v1
+      path: /users/
+      replace: '{catrecid}'
+  notes:
+    url: https://services-dev.cat.com
+    path: /catDigital/notes/v1/notes
+    maxNotesPerLevel: 1000
+    maxDepth: 5
+  storage:
+    url: https://services-dev.cat.com
+    path: /catDigital/storage/v1/files/metadata
+    max-retries: 10
+
+
+# Dealer URL
+dealer:
+  url: https://dealer-details.platform.dev.helios-internal.cat.com
+  path: /dealerDetails/v1/dealers/propertySearch
+  max-retries: 10
+
+# template folder stylesheet
+template:
+  path: src/main/resources/template/
+
+# parameters functional test
+functionalTest:
+  url: http://localhost:8081
+
+# global configuration
+global:
+  dealer:
+    region: us-east-2
+  proxy:
+    enable: false
+
+# OkHttp Client config
+Okhttp:
+  connection:
+    timeout:
+      seconds: 15
+    read:
+      timeout:
+        seconds: 15
+  logging:
+    request: true
+    response: true
+  retry:
+    maximum: 3

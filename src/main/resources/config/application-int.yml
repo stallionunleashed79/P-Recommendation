@@ -1,0 +1,76 @@
+logging:
+  level:
+    root: INFO
+    com.cat: DEBUG
+
+env:
+  local: false
+
+server:
+  port: 443
+  ssl:
+    key-store: /home/app/secrets/cert.p12
+    key-store-type: PKCS12
+    key-store-password: # this line is required even if you don't have a password
+  tomcat:
+    accesslog:
+      enabled: true
+      rotate: false
+      directory: /var/logs
+      prefix: access
+      buffered: false
+      suffix: .log
+      file-date-format:
+      pattern: '%{yyyy-MM-dd''T''HH:mm:ss.SSSZ}t|INFO |tomcat|accesslog|0|{"sourceHost":"%{X-Forwarded-For}i","remoteHost":"%h","logicalUser":"%l","user":"%u","path":"%r","status":"%s","bytes":%B,"processTime":%D}'
+
+
+# Spring Actuator
+management:
+  endpoints:
+    enabled-by-default: false
+    web.exposure.include: "*"
+  endpoint:
+    health.enabled: true
+    metrics.enabled: true
+    info.enabled: true
+
+spring:
+  flyway:
+    enable: true
+    cleanOnValidationError: true
+    baseline-on-migrate: true
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+client:
+  user:
+    management:
+      url: https://services-qa.cat.com/catDigital/userManagement/v1
+      path: /users/
+      replace: '{catrecid}'
+  notes:
+    url: https://services-qa.cat.com
+    path: /catDigital/notes/v1/notes
+    maxNotesPerLevel: 1000
+    maxDepth: 5
+
+# Dealer URL
+dealer:
+  url: https://dealer-details.platform.qa.helios-internal.cat.com
+  path: /dealerDetails/v1/dealers/propertySearch
+  max-retries: 10
+  proxies:
+    http: http://proxy.cat.com:80
+    https: http://proxy.cat.com:80
+
+# template folder stylesheet
+template:
+  path: classpath:template/
+
+# functional tests parameters
+functionalTest:
+  url: https://services-qa.cat.com/catDigital

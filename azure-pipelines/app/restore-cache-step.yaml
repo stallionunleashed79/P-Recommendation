@@ -1,0 +1,16 @@
+parameters:
+  - name: cacheDisplayName
+    type: string
+  - name: cacheName
+    type: string
+  - name: cacheKeyFilePath
+    type: string
+  - name: cachePath
+    type: string
+steps:
+  - task: Cache@2
+    displayName: Restore ${{ parameters.cacheDisplayName }} cache
+    inputs:
+      key: ${{ parameters.cacheName }} | ${{ parameters.cacheKeyFilePath }}
+      path: ${{ parameters.cachePath }}
+      restoreKeys: ${{ parameters.cacheName }}

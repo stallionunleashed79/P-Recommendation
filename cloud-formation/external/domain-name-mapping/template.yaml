@@ -1,0 +1,13 @@
+%YAML 1.2
+---
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  EnvironmentName:
+    Type: String
+Resources:
+  Stack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/api-gateway/base-path-mapping.yaml
+      Parameters:
+        ImportNamePrefix: !Sub "pfm-reco-${EnvironmentName}-external"

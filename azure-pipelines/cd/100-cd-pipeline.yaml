@@ -1,0 +1,71 @@
+trigger: 
+  branches:
+    include:
+    - master
+    - huseyin.akten/cicd
+  paths:
+    include:
+      - azure-pipelines/cd/
+      - cloud-formation/
+      - deployment/
+
+pool:
+  vmImage: ubuntu-18.04
+
+name: $(Build.BuildId)
+
+variables:
+  applicationName: pfm-reco
+  teamName: leo
+  dataClassificationLabel: red
+  riskdomain: AL
+  deleteStacks: false
+  bucketPrefix: cd-azdo-cfn-pfm-leo
+
+resources:
+  pipelines:
+    - pipeline: P-Datahub-Reco-CI
+      source: P-Datahub-Reco-CI
+      trigger:
+        branches:
+          include:
+          - refs/heads/master
+          - refs/heads/huseyin.akten/cicd
+
+#Stages
+stages:
+
+- template: 110-deploy.yaml
+  parameters:
+    ENV_SUFFIX: 'dev'
+    REGION_NAME: 'us-east-2'
+    ROLE_ARN: 'arn:aws:iam::900182000710:role/cd-azdo-cfn-pfm-leo-dev-us-east-2-Cfn-role'
+    BUILD_NUMBER: $(Build.BuildNumber)
+    AWS_CREDENTIALS: 'DEV-cd-azdo-cfn-pfm-leo-us-east-2'
+    DISPLAY_NAME: 'Dev Deployment'
+    GATED_ENV: 'P-Datahub-Reco-Dev'
+    SecurityGroupIDs: sg-0b8d5f155eefa020f,sg-0c5a31565d4bab94a
+    SubnetIDs: subnet-089242921b4b34b0a,subnet-0463ffd0fc7037c87
+    CertificateARN: 'arn:aws:acm:us-east-2:900182000710:certificate/6cef3bc3-077b-4da7-a108-97f669bb1b97'
+    ApiGatewayLogCollectorKinesisARN: "arn:aws:kinesis:us-east-2:900182000710:stream/pfm-cs-cat_digital_centralized_apigateway-es-kin"
+    ApiGatewayLogCollectorRoleARN: "arn:aws:iam::900182000710:role/platform-avengers-cloudwatch-role"
+    ECSSecurityGroupIDs: sg-0c9794699c59ac0ff
+    VPCID: "vpc-0d957ae0a9a60c038"
+
+- template: 110-deploy.yaml
+  parameters:
+    ENV_SUFFIX: 'int'
+    REGION_NAME: 'us-east-2'
+    ROLE_ARN: 'arn:aws:iam::460510738068:role/cd-azdo-cfn-pfm-leo-int-us-east-2-Cfn-role'
+    BUILD_NUMBER: $(Build.BuildNumber)
+    AWS_CREDENTIALS: 'INT-cd-azdo-cfn-pfm-leo-us-east-2'
+    DISPLAY_NAME: 'Int Deployment'
+    GATED_ENV: 'P-Datahub-Reco-Int'
+    SecurityGroupIDs: sg-0c7b0d16c0656dc71
+    SubnetIDs: subnet-0096348959a102094,subnet-052e710a66b5bc98c,subnet-0f190e44811c88cb1
+    CertificateARN: 'arn:aws:acm:us-east-2:460510738068:certificate/a78c0ab9-bc0f-4141-afe0-dab829e5d605'
+    ApiGatewayLogCollectorKinesisARN: "arn:aws:kinesis:us-east-2:460510738068:stream/pfm-cs-cat_digital_centralized_apigateway-es-kin"
+    ApiGatewayLogCollectorRoleARN: "arn:aws:iam::460510738068:role/platform-avengers-cloudwatch-role"
+    ECSSecurityGroupIDs: sg-027f65126b8602334,sg-0b0ca6811d51ea8d0
+    VPCID: "vpc-0a710e41094ad4b09"
+

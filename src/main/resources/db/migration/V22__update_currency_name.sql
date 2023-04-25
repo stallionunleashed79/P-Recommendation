@@ -1,0 +1,1 @@
+UPDATE recommendation_collection_options SET option_name = option_value WHERE collection_id = 2;

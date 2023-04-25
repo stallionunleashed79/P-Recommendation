@@ -1,0 +1,41 @@
+Configuration:
+  status: error
+  Properties:
+    property:
+      - name: "logs_dir"
+        value: "/var/logs"
+      - name: "DefaultPattern"
+        value: "%d{yyyy-MM-dd'T'HH:mm:ss.SSS}{GMT+0}|%-5p|%c{1}|%M|%L|%X{id}:%X{ip}:%replace{%m}{\r?\n}{ }%n"
+
+  appenders:
+    Console:
+      name: LogToConsole
+      PatternLayout:
+        Pattern: ${DefaultPattern}
+
+    RollingFile:
+      - name: LogToRollingFile
+        fileName: ${logs_dir}/app.log
+        filePattern: "${logs_dir}/backup/app-%i.log"
+        PatternLayout:
+          pattern: ${DefaultPattern}
+        Policies:
+          SizeBasedTriggeringPolicy:
+            size: 100MB
+        DefaultRollOverStrategy:
+          max: 5
+
+  Loggers:
+    logger:
+      - name: com.cat
+        level: info
+        additivity: false
+        AppenderRef:
+          - ref: LogToConsole
+          - ref: LogToRollingFile
+
+    Root:
+      level: info
+      AppenderRef:
+        - ref: LogToConsole
+        - ref: LogToRollingFile

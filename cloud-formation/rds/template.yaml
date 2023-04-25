@@ -1,0 +1,102 @@
+%YAML 1.2
+---
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  ConfigurationName:
+    Type: String
+  EnvironmentName:
+    Type: String
+  QualifiedDeploymentName:
+    Type: String
+  SecurityGroupIDs:
+    Type: String
+  SubnetIDs:
+    Type: String
+Mappings:
+  ConfigurationMap:
+    dev-main:
+      InstanceClassType: db.r4.large
+      SnapshotName: ""
+    int-main:
+      InstanceClassType: db.r4.4xlarge
+      SnapshotName: ""
+      SnowSnsTopic: "arn:aws:sns:us-east-2:546945837982:SNOWCatDigitalCustom"
+    prod-main:
+      InstanceClassType: db.r4.4xlarge
+      SnapshotName: ""
+      SnowSnsTopic: "arn:aws:sns:us-east-2:620890749476:SNOWCatDigitalCustom"
+Conditions:
+  IsProductionLikeDeployment:
+    !Or [
+      !Equals [!Ref EnvironmentName, int],
+      !Equals [!Ref EnvironmentName, prod]
+    ]
+Resources:
+  ClusterParameterGroupStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/rds/db-cluster-parameter-groups/postgres.yaml
+      Parameters:
+        ParameterGroupDescription: !Ref QualifiedDeploymentName
+  PasswordSecretStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/secrets-manager/secrets/aurora-password.yaml
+      Parameters:
+        SecretName: !Ref QualifiedDeploymentName
+  PfmRecoDB:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aurora/postgres.yaml
+      Parameters:
+        ClusterParameterGroupName: !GetAtt ClusterParameterGroupStack.Outputs.ParameterGroupName
+        ExportNamePrefix: !Sub ${QualifiedDeploymentName}
+        IsProductionLikeDeployment: !If
+          - IsProductionLikeDeployment
+          - true
+          - false
+        QualifiedDeploymentName: !Ref QualifiedDeploymentName
+        PasswordSecretARN: !GetAtt PasswordSecretStack.Outputs.SecretARN
+        SecurityGroupIDs: !Ref SecurityGroupIDs
+        SubnetIDs: !Ref SubnetIDs
+        Version: 10.7
+        ClusterName: !Sub ${QualifiedDeploymentName}
+        DatabaseName: !Sub pfm_reco_${EnvironmentName}
+  InstanceStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/rds/db-instances/postgres.yaml
+      Parameters:
+        ClassType:
+          !FindInMap [
+            ConfigurationMap,
+            !Ref ConfigurationName,
+            InstanceClassType,
+          ]
+        ClusterName: !GetAtt PfmRecoDB.Outputs.ClusterName
+        InstanceName: !Ref QualifiedDeploymentName
+  DbCpuUsageAlarmMultipleActions:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsProductionLikeDeployment
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/cloud-watch/alarms/CloudwatchAlarm_Multiple_Actions.yaml
+      Parameters:
+        AlarmName: !Sub ${QualifiedDeploymentName}-rds-cpu-utilization-with-servicenow
+        AlarmDescription: '"{\"Configuration Item\":\"CAT Digital Platform\",\"AssignTo\":\"CatDigital-PerformanceOperationsCenter-Team\",\"Ticket\":\"True\",\"Impact\":\"medium\",\"Urgency\":\"medium\"}"'
+        TreatMissingData: "ignore"
+        AlarmActionsKey1: "RecoSupport"
+        AlarmActionsValue1:
+          Fn::ImportValue: !Sub pfm-reco-sns-${EnvironmentName}-topic-arn
+        AlarmActionsKey2: "CdocSns"
+        AlarmActionsValue2:
+          !FindInMap [ConfigurationMap, !Ref ConfigurationName, SnowSnsTopic]
+        Namespace: AWS/RDS
+        MetricName: CPUUtilization
+        DimensionsKey1: "DBClusterIdentifier"
+        DimensionsValue1: !GetAtt PfmRecoDB.Outputs.ClusterName
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        Unit: Percent
+        Statistic: "Average"
+        AlarmEvaluationPeriods: 1
+        AlarmEvaluationPeriodSeconds: 120
+        Threshold: 65

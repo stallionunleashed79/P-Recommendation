@@ -1,0 +1,300 @@
+%YAML 1.2
+---
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  ConfigurationName:
+    Type: String
+  DockerImageTagName:
+    Type: String
+  ECSSecurityGroupIDs:
+    Type: String
+  ECSSubnetIDs:
+    Type: String
+  EnvironmentName:
+    Type: String
+  LoadBalancerSubnetIDs:
+    Type: String
+  QualifiedDeploymentName:
+    Type: String
+  OpenAPIDocumentS3Key:
+    Type: String
+  S3BucketName:
+    Type: String
+  ShouldSetDesiredECSTaskCount:
+    Type: String
+    Default: True
+  VPCID:
+    Type: AWS::EC2::VPC::Id
+Mappings:
+  ConfigurationMap:
+    dev-main:
+      MaximumECSTaskCount: 6
+      MinimumECSTaskCount: 1
+      CloudWatchRetentionDays: 7
+    int-main:
+      MaximumECSTaskCount: 6
+      MinimumECSTaskCount: 1
+      CloudWatchRetentionDays: 7
+      SnowSnsTopic: arn:aws:sns:us-east-2:546945837982:SNOWCatDigitalCustom
+    prod-main:
+      MaximumECSTaskCount: 8
+      MinimumECSTaskCount: 4
+      CloudWatchRetentionDays: 7
+      SnowSnsTopic: arn:aws:sns:us-east-2:620890749476:SNOWCatDigitalCustom
+Conditions:
+  IsProdEnvironment: !Equals [!Ref EnvironmentName, prod]
+  CreateIntProdResources:
+    !Or [!Equals [!Ref EnvironmentName, int], !Equals [!Ref EnvironmentName, prod]]
+Resources:
+  LoadBalancerStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/elastic-load-balancing-v2/load-balancer.yaml
+      Parameters:
+        LoadBalancerName: !Ref QualifiedDeploymentName
+        SubnetIDs: !Ref LoadBalancerSubnetIDs
+  LoadBalancerTargetGroupStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/elastic-load-balancing-v2/target-group.yaml
+      Parameters:
+        TargetGroupName: !Ref QualifiedDeploymentName
+        VPCID: !Ref VPCID
+  LoadBalancerListenerStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/elastic-load-balancing-v2/listener.yaml
+      Parameters:
+        LoadBalancerARN: !GetAtt LoadBalancerStack.Outputs.LoadBalancerARN
+        TargetGroupARN: !GetAtt LoadBalancerTargetGroupStack.Outputs.TargetGroupARN
+  ECSClusterStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/ecs/cluster.yaml
+      Parameters:
+        ClusterName: !Sub ${QualifiedDeploymentName}
+  ECSApplicationLogGroupStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/logs/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${QualifiedDeploymentName}-ecs-application-container
+        CloudWatchRetentionDays: !FindInMap
+          - ConfigurationMap
+          - !Ref ConfigurationName
+          - CloudWatchRetentionDays
+  ECSLogCollectorLogGroupStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/logs/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${QualifiedDeploymentName}-ecs-log-collector-container
+        CloudWatchRetentionDays: !FindInMap
+          - ConfigurationMap
+          - !Ref ConfigurationName
+          - CloudWatchRetentionDays
+  ECSTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ContainerDefinitions:
+        - Environment:
+            - Name: applog_file_path
+              Value: /var/logs/app.log,/var/logs/access.log
+            - Name: tag
+              Value: !Sub /ecs/${AWS::AccountId}/${AWS::Region}/${QualifiedDeploymentName}-application
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/platform-avengers-container-services-log-collector:latest
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !GetAtt ECSLogCollectorLogGroupStack.Outputs.LogGroupName
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: prefix
+          MountPoints:
+            - ContainerPath: /var/logs/
+              SourceVolume: volume
+          Name: !Sub ${QualifiedDeploymentName}-log-collector
+        - DependsOn:
+            - Condition: START
+              ContainerName: !Sub ${QualifiedDeploymentName}-log-collector
+          Environment:
+            - Name: MANAGEMENT_METRICS_EXPORT_CLOUDWATCH_NAMESPACE
+              Value: !Sub ecs:${QualifiedDeploymentName}
+            - Name: S3_BUCKET
+              Value:
+                Fn::ImportValue: !Sub ${QualifiedDeploymentName}-s3-bucket-name
+            - Name: SPRING_DATASOURCE_URL
+              Value:
+                Fn::ImportValue: !Sub ${QualifiedDeploymentName}-jdbc-url
+            - Name: SPRING_DATASOURCE_USERNAME
+              Value:
+                Fn::ImportValue: !Sub ${QualifiedDeploymentName}-username
+            - Name: SPRING_PROFILES_ACTIVE
+              Value: !Ref EnvironmentName
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${QualifiedDeploymentName}:${DockerImageTagName}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !GetAtt ECSApplicationLogGroupStack.Outputs.LogGroupName
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: prefix
+          MountPoints:
+            - ContainerPath: /var/logs/
+              SourceVolume: volume
+          Name: !Sub ${QualifiedDeploymentName}-application
+          PortMappings:
+            - ContainerPort: 443
+          Secrets:
+            - Name: SPRING_DATASOURCE_PASSWORD
+              ValueFrom:
+                Fn::ImportValue: !Sub ${QualifiedDeploymentName}-password-secret-arn
+      Cpu: 4 vCPU
+      ExecutionRoleArn: !Sub "pbr-pfm-reco-ecs-execution-role-${EnvironmentName}"
+      Family: !Ref QualifiedDeploymentName
+      Memory: 16 GB
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      Tags:
+        - Key: Name
+          Value: !Ref QualifiedDeploymentName
+      TaskRoleArn: !Sub "pbr-pfm-reco-ecs-execution-role-${EnvironmentName}"
+      Volumes:
+        - Name: volume
+  ECSServiceStackNumber:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: LoadBalancerListenerStack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/ecs/service.yaml
+      Parameters:
+        ClusterName: !GetAtt ECSClusterStack.Outputs.ClusterName
+        ContainerName: !Sub ${QualifiedDeploymentName}-application
+        SecurityGroupIDs: !Ref ECSSecurityGroupIDs
+        ServiceName: !Sub "${QualifiedDeploymentName}-ECSServiceStackNumber"
+        ShouldSetDesiredTaskCount: !Ref ShouldSetDesiredECSTaskCount
+        SubnetIDs: !Ref ECSSubnetIDs
+        TargetGroupARN: !GetAtt LoadBalancerTargetGroupStack.Outputs.TargetGroupARN
+        TaskDefinitionARN: !Ref ECSTaskDefinition
+  ScalableTargetStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/application-auto-scaling/ecs-scalable-target.yaml
+      Parameters:
+        ClusterName: !GetAtt ECSClusterStack.Outputs.ClusterName
+        MaximumTaskCount: !FindInMap
+          - ConfigurationMap
+          - !Ref ConfigurationName
+          - MaximumECSTaskCount
+        MinimumTaskCount: !FindInMap
+          - ConfigurationMap
+          - !Ref ConfigurationName
+          - MinimumECSTaskCount
+        RoleName: pfm-reco-ecs-role
+        ServiceName: !GetAtt ECSServiceStackNumber.Outputs.ServiceName
+  ScalingPolicyStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/application-auto-scaling/ecs-scaling-policy.yaml
+      Parameters:
+        QualifiedDeploymentName: !Ref QualifiedDeploymentName
+        TargetARN: !GetAtt ScalableTargetStack.Outputs.TargetARN
+        TargetCPU: 70
+
+  CpuAlarmStackMultipleActions:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateIntProdResources
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/cloud-watch/alarms/CloudwatchAlarm_Multiple_Actions.yaml
+      Parameters:
+        AlarmName: !Sub ${QualifiedDeploymentName}-${EnvironmentName}-ECS-CPU-Utilization-alarm-with-multiple actions
+        AlarmDescription: '"{\"Configuration Item\":\"CAT Digital Platform\",\"AssignTo\":\"CatDigital-PerformanceOperationsCenter-Team\",\"Ticket\":\"True\",\"Impact\":\"medium\",\"Urgency\":\"medium\"}"'
+        TreatMissingData: "ignore"
+        AlarmActionsKey1: "RecoSupport"
+        AlarmActionsValue1:
+          Fn::ImportValue: !Sub pfm-reco-sns-${EnvironmentName}-topic-arn
+        AlarmActionsKey2: "CdocSns"
+        AlarmActionsValue2:
+          !FindInMap [ConfigurationMap, !Ref ConfigurationName, SnowSnsTopic]
+        Namespace: AWS/ECS
+        MetricName: CPUUtilization
+        DimensionsKey1: "ClusterName"
+        DimensionsValue1: !GetAtt ECSClusterStack.Outputs.ClusterName
+        DimensionsKey2: "ServiceName"
+        DimensionsValue2: !GetAtt ECSServiceStackNumber.Outputs.ServiceName
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        Unit: Percent
+        Statistic: "Average"
+        AlarmEvaluationPeriods: 3
+        AlarmEvaluationPeriodSeconds: 60
+        Threshold: 90
+  MaxTasksAlarmStackMultipleActions:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateIntProdResources
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/cloud-watch/alarms/CloudwatchAlarm_Multiple_Actions.yaml
+      Parameters:
+        AlarmName: !Sub ${QualifiedDeploymentName}-${EnvironmentName}-ECS-Max-Tasks-alarm-with-multiple actions
+        AlarmDescription: '"{\"Configuration Item\":\"CAT Digital Platform\",\"AssignTo\":\"CatDigital-PerformanceOperationsCenter-Team\",\"Ticket\":\"True\",\"Impact\":\"medium\",\"Urgency\":\"medium\"}"'
+        TreatMissingData: "ignore"
+        AlarmActionsKey1: "RecoSupport"
+        AlarmActionsValue1:
+          Fn::ImportValue: !Sub pfm-reco-sns-${EnvironmentName}-topic-arn
+        AlarmActionsKey2: "CdocSns"
+        AlarmActionsValue2:
+          !FindInMap [ConfigurationMap, !Ref ConfigurationName, SnowSnsTopic]
+        Namespace: ECS/ContainerInsights
+        MetricName: DesiredTaskCount
+        DimensionsKey1: "ClusterName"
+        DimensionsValue1: !GetAtt ECSClusterStack.Outputs.ClusterName
+        DimensionsKey2: "ServiceName"
+        DimensionsValue2: !GetAtt ECSServiceStackNumber.Outputs.ServiceName
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        Unit: Count
+        Statistic: "Average"
+        AlarmEvaluationPeriods: 30
+        AlarmEvaluationPeriodSeconds: 60
+        Threshold: !GetAtt ScalableTargetStack.Outputs.MaximumTaskCount
+  JvmAlarmStack:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CreateIntProdResources
+    Properties:
+      AlarmActions:
+        - Fn::ImportValue: !Sub pfm-reco-sns-${EnvironmentName}-topic-arn
+        - !FindInMap [ConfigurationMap, !Ref ConfigurationName, SnowSnsTopic]
+      AlarmName: !Sub ${QualifiedDeploymentName}-${EnvironmentName}-jvm-tenured-memory
+      AlarmDescription: '"{\"Configuration Item\":\"CAT Digital Platform\",\"AssignTo\":\"CatDigital-PerformanceOperationsCenter-Team\",\"Ticket\":\"True\",\"Impact\":\"medium\",\"Urgency\":\"medium\"}"'
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 3
+      Metrics:
+        - Id: usedMemoryPercent
+          Expression: usedMemory / maxMemory * 100
+        - Id: usedMemory
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: area
+                  Value: heap
+                - Name: id
+                  Value: Tenured Gen
+              MetricName: jvm.memory.used.value
+              Namespace: !Sub ecs:${QualifiedDeploymentName}
+            Period: 60
+            Stat: Average
+          ReturnData: false
+        - Id: maxMemory
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: area
+                  Value: heap
+                - Name: id
+                  Value: Tenured Gen
+              MetricName: jvm.memory.max.value
+              Namespace: !Sub ecs:${QualifiedDeploymentName}
+            Period: 60
+            Stat: Average
+          ReturnData: false
+      Threshold: 70
+Outputs:
+  LoadBalancerARN: 
+    Value: !GetAtt LoadBalancerStack.Outputs.LoadBalancerARN
+    Export:
+      Name: !Sub ${QualifiedDeploymentName}-loadbalancerarn

@@ -1,0 +1,25 @@
+resources:
+  repositories:
+    - repository: infraAzurePipelines
+      type: git
+      name: P-Data-Hub-Infra-CI-CD
+      ref: refs/tags/v10.0.0
+trigger:
+  batch: true
+  branches:
+    include:
+      - master
+  paths:
+    include:
+      - cloud-formation/domain-name/azure-pipelines/cd-pipeline.yaml
+      - cloud-formation/domain-name/cloud-formation.yaml
+extends:
+  template: cloud-formation/template/domain-name/cd/deploy-instances.yaml@infraAzurePipelines
+  parameters:
+    devInstanceNames: [main]
+    intInstanceNames: [main]
+    prodInstanceNames: [main]
+    stackNamePrefix: pfm-infra-plm
+    serviceName: plm
+    dataClassificationLabel: red
+    teamName: Echo

@@ -1,0 +1,447 @@
+%YAML 1.2
+---
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  ApiGatewayLogCollectorKinesisARN:
+    Type: String
+  ConfigurationName:
+    Type: String
+  DockerImageTagName:
+    Type: String
+  ECSSecurityGroupIDs:
+    Type: String
+  ECSSubnetIDs:
+    Type: String
+  EnvironmentName:
+    Type: String
+  LoadBalancerSubnetIDs:
+    Type: String
+  LogCollectorRoleARN:
+    Type: String
+  OpenAPIDocumentS3Key:
+    Type: String
+  QualifiedDeploymentName:
+    Type: String
+  S3BucketName:
+    Type: String
+  ShouldSetDesiredECSTaskCount:
+    Type: String
+  VPCID:
+    Type: AWS::EC2::VPC::Id
+Mappings:
+  ConfigurationMap:
+    dev-main:
+      MaximumECSTaskCount: 6
+      MinimumECSTaskCount: 1
+    int-main:
+      MaximumECSTaskCount: 6
+      MinimumECSTaskCount: 1
+      SnowSnsTopic: arn:aws:sns:us-east-2:546945837982:SNOWCatDigitalCustom
+    prod-main:
+      MaximumECSTaskCount: 8
+      MinimumECSTaskCount: 4
+      SnowSnsTopic: arn:aws:sns:us-east-2:620890749476:SNOWCatDigitalCustom
+    prod-onboarding:
+      MaximumECSTaskCount: 8
+      MinimumECSTaskCount: 4
+      SnowSnsTopic: arn:aws:sns:us-east-2:620890749476:SNOWCatDigitalCustom
+Conditions:
+  IsProdEnvironment: !Equals [!Ref EnvironmentName, prod]
+  CreateIntProdResources:
+    !Or [!Equals [!Ref EnvironmentName, int], !Condition IsProdEnvironment]
+Resources:
+  LoadBalancerStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/elastic-load-balancing-v2/load-balancer.yaml
+      Parameters:
+        LoadBalancerName: !Ref QualifiedDeploymentName
+        SubnetIDs: !Ref LoadBalancerSubnetIDs
+  LoadBalancerTargetGroupStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/elastic-load-balancing-v2/target-group.yaml
+      Parameters:
+        TargetGroupName: !Ref QualifiedDeploymentName
+        VPCID: !Ref VPCID
+  LoadBalancerListenerStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/elastic-load-balancing-v2/listener.yaml
+      Parameters:
+        LoadBalancerARN: !GetAtt LoadBalancerStack.Outputs.LoadBalancerARN
+        TargetGroupARN: !GetAtt LoadBalancerTargetGroupStack.Outputs.TargetGroupARN
+  ECSClusterStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/ecs/cluster.yaml
+      Parameters:
+        ClusterName: !Sub ${QualifiedDeploymentName}
+  ECSApplicationLogGroupStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/logs/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${QualifiedDeploymentName}-ecs-application-container
+  ECSLogCollectorLogGroupStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/logs/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${QualifiedDeploymentName}-ecs-log-collector-container
+  ECSTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ContainerDefinitions:
+        - Environment:
+            - Name: applog_file_path
+              Value: /var/logs/app.log,/var/logs/access.log
+            - Name: tag
+              Value: !Sub /ecs/${AWS::AccountId}/${AWS::Region}/${QualifiedDeploymentName}-application
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/platform-avengers-container-services-log-collector:latest
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !GetAtt ECSLogCollectorLogGroupStack.Outputs.LogGroupName
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: prefix
+          MountPoints:
+            - ContainerPath: /var/logs/
+              SourceVolume: volume
+          Name: !Sub ${QualifiedDeploymentName}-log-collector
+        - DependsOn:
+            - Condition: START
+              ContainerName: !Sub ${QualifiedDeploymentName}-log-collector
+          Environment:
+            - Name: MANAGEMENT_METRICS_EXPORT_CLOUDWATCH_NAMESPACE
+              Value: !Sub ecs:${QualifiedDeploymentName}
+            - Name: S3_BUCKET
+              Value:
+                Fn::ImportValue: !Sub ${QualifiedDeploymentName}-s3-bucket-name
+            - Name: SPRING_DATASOURCE_URL
+              Value:
+                Fn::ImportValue: !If
+                  - IsProdEnvironment
+                  - !Sub ${QualifiedDeploymentName}-2-rds-jdbc-url
+                  - !Sub ${QualifiedDeploymentName}-rds-jdbc-url
+            - Name: SPRING_DATASOURCE_USERNAME
+              Value:
+                Fn::ImportValue: !If
+                  - IsProdEnvironment
+                  - !Sub ${QualifiedDeploymentName}-2-rds-username
+                  - !Sub ${QualifiedDeploymentName}-rds-username
+            - Name: SPRING_PROFILES_ACTIVE
+              Value: !Ref EnvironmentName
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${QualifiedDeploymentName}:${DockerImageTagName}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !GetAtt ECSApplicationLogGroupStack.Outputs.LogGroupName
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: prefix
+          MountPoints:
+            - ContainerPath: /var/logs/
+              SourceVolume: volume
+          Name: !Sub ${QualifiedDeploymentName}-application
+          PortMappings:
+            - ContainerPort: 443
+          Secrets:
+            - Name: SPRING_DATASOURCE_PASSWORD
+              ValueFrom:
+                Fn::ImportValue: !Sub ${QualifiedDeploymentName}-rds-password-secret-arn
+      Cpu: 4 vCPU
+      ExecutionRoleArn: pbr-pfm-infra-cva-ecs-role
+      Family: !Ref QualifiedDeploymentName
+      Memory: 16 GB
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      Tags:
+        - Key: Name
+          Value: !Ref QualifiedDeploymentName
+      TaskRoleArn: pbr-pfm-infra-cva-ecs-role
+      Volumes:
+        - Name: volume
+  ECSServiceStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: LoadBalancerListenerStack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/ecs/service.yaml
+      Parameters:
+        ClusterName: !GetAtt ECSClusterStack.Outputs.ClusterName
+        ContainerName: !Sub ${QualifiedDeploymentName}-application
+        SecurityGroupIDs: !Ref ECSSecurityGroupIDs
+        ServiceName: !Ref QualifiedDeploymentName
+        ShouldSetDesiredTaskCount: !Ref ShouldSetDesiredECSTaskCount
+        SubnetIDs: !Ref ECSSubnetIDs
+        TargetGroupARN: !GetAtt LoadBalancerTargetGroupStack.Outputs.TargetGroupARN
+        TaskDefinitionARN: !Ref ECSTaskDefinition
+  CVA5XXAlarmMultipleActions:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateIntProdResources
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/cloud-watch/alarms/CloudwatchAlarm_Multiple_Actions.yaml
+      Parameters:
+        AlarmName: !Sub ${QualifiedDeploymentName}-${EnvironmentName}-CVA-5XX-alarm-with-multiple actions
+        AlarmDescription: '"{\"Configuration Item\":\"CAT Digital Platform\",\"AssignTo\":\"CatDigital-PerformanceOperationsCenter-Team\",\"Ticket\":\"True\",\"Impact\":\"medium\",\"Urgency\":\"medium\"}"'
+        TreatMissingData: "ignore"
+        AlarmActionsKey1: "InfraSns"
+        AlarmActionsValue1:
+          Fn::ImportValue: !Sub ${QualifiedDeploymentName}-sns-topic-arn
+        AlarmActionsKey2: "CdocSns"
+        AlarmActionsValue2:
+          !FindInMap [ConfigurationMap, !Ref ConfigurationName, SnowSnsTopic]
+        Namespace: AWS/ApiGateway
+        MetricName: 5XXError
+        DimensionsKey1: "ApiName"
+        DimensionsValue1: !Sub ${QualifiedDeploymentName}-external
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        Unit: Count
+        Statistic: "Sum"
+        AlarmEvaluationPeriods: 1
+        AlarmEvaluationPeriodSeconds: 120
+        Threshold: 1
+  CVAInternal5XXAlarmMultipleActions:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateIntProdResources
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/cloud-watch/alarms/CloudwatchAlarm_Multiple_Actions.yaml
+      Parameters:
+        AlarmName: !Sub ${QualifiedDeploymentName}-${EnvironmentName}-CVA-Internal-5XX-alarm-with-multiple actions
+        AlarmDescription: '"{\"Configuration Item\":\"CAT Digital Platform\",\"AssignTo\":\"CatDigital-PerformanceOperationsCenter-Team\",\"Ticket\":\"True\",\"Impact\":\"medium\",\"Urgency\":\"medium\"}"'
+        TreatMissingData: "ignore"
+        AlarmActionsKey1: "InfraSns"
+        AlarmActionsValue1:
+          Fn::ImportValue: !Sub ${QualifiedDeploymentName}-sns-topic-arn
+        AlarmActionsKey2: "CdocSns"
+        AlarmActionsValue2:
+          !FindInMap [ConfigurationMap, !Ref ConfigurationName, SnowSnsTopic]
+        Namespace: AWS/ApiGateway
+        MetricName: 5XXError
+        DimensionsKey1: "ApiName"
+        DimensionsValue1: !Sub ${QualifiedDeploymentName}-internal
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        Unit: Count
+        Statistic: "Sum"
+        AlarmEvaluationPeriods: 1
+        AlarmEvaluationPeriodSeconds: 120
+        Threshold: 1
+  CVAHealthCheckAlarmMultipleActions:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateIntProdResources
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/cloud-watch/alarms/CloudwatchAlarm_Multiple_Actions.yaml
+      Parameters:
+        AlarmName: !Sub ${QualifiedDeploymentName}-${EnvironmentName}-CVA-Health-Check-alarm-with-multiple actions
+        AlarmDescription: '"{\"Configuration Item\":\"CAT Digital Platform\",\"AssignTo\":\"CatDigital-PerformanceOperationsCenter-Team\",\"Ticket\":\"True\",\"Impact\":\"medium\",\"Urgency\":\"medium\"}"'
+        TreatMissingData: "ignore"
+        AlarmActionsKey1: "InfraSns"
+        AlarmActionsValue1:
+          Fn::ImportValue: !Sub ${QualifiedDeploymentName}-sns-topic-arn
+        AlarmActionsKey2: "CdocSns"
+        AlarmActionsValue2:
+          !FindInMap [ConfigurationMap, !Ref ConfigurationName, SnowSnsTopic]
+        Namespace: AWS/ApiGateway
+        MetricName: 5XXError
+        DimensionsKey1: "ApiName"
+        DimensionsValue1: !Sub ${QualifiedDeploymentName}-internal
+        DimensionsKey2: "Resource"
+        DimensionsValue2: "/actuator/health"
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        Unit: Count
+        Statistic: "Sum"
+        AlarmEvaluationPeriods: 1
+        AlarmEvaluationPeriodSeconds: 120
+        Threshold: 1
+  CpuAlarmStackMultipleActions:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateIntProdResources
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/cloud-watch/alarms/CloudwatchAlarm_Multiple_Actions.yaml
+      Parameters:
+        AlarmName: !Sub ${QualifiedDeploymentName}-${EnvironmentName}-CVA-ECS-CPU-Utilization-alarm-with-multiple actions
+        AlarmDescription: '"{\"Configuration Item\":\"CAT Digital Platform\",\"AssignTo\":\"CatDigital-PerformanceOperationsCenter-Team\",\"Ticket\":\"True\",\"Impact\":\"medium\",\"Urgency\":\"medium\"}"'
+        TreatMissingData: "ignore"
+        AlarmActionsKey1: "InfraSns"
+        AlarmActionsValue1:
+          Fn::ImportValue: !Sub ${QualifiedDeploymentName}-sns-topic-arn
+        AlarmActionsKey2: "CdocSns"
+        AlarmActionsValue2:
+          !FindInMap [ConfigurationMap, !Ref ConfigurationName, SnowSnsTopic]
+        Namespace: AWS/ECS
+        MetricName: CPUUtilization
+        DimensionsKey1: "ClusterName"
+        DimensionsValue1: !GetAtt ECSClusterStack.Outputs.ClusterName
+        DimensionsKey2: "ServiceName"
+        DimensionsValue2: !GetAtt ECSServiceStack.Outputs.ServiceName
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        Unit: Percent
+        Statistic: "Average"
+        AlarmEvaluationPeriods: 3
+        AlarmEvaluationPeriodSeconds: 60
+        Threshold: 90
+  JvmAlarmStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateIntProdResources
+    DependsOn: ECSServiceStack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/cloud-watch/alarms/ecs/jvm.yaml
+      Parameters:
+        AlarmDescription: '"{\"Configuration Item\":\"CAT Digital Platform\",\"AssignTo\":\"CatDigital-PerformanceOperationsCenter-Team\",\"Ticket\":\"True\",\"Impact\":\"medium\",\"Urgency\":\"medium\"}"'
+        AlarmActionsKey2: "CdocSns"
+        AlarmActionsValue2:
+          !FindInMap [ConfigurationMap, !Ref ConfigurationName, SnowSnsTopic]
+        CloudWatchNamespace: !Sub ecs:${QualifiedDeploymentName}
+        EnvironmentName: !Ref EnvironmentName
+        QualifiedDeploymentName: !Ref QualifiedDeploymentName
+  ScalableTargetStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/application-auto-scaling/ecs-scalable-target.yaml
+      Parameters:
+        ClusterName: !GetAtt ECSClusterStack.Outputs.ClusterName
+        MaximumTaskCount: !FindInMap
+          - ConfigurationMap
+          - !Ref ConfigurationName
+          - MaximumECSTaskCount
+        MinimumTaskCount: !FindInMap
+          - ConfigurationMap
+          - !Ref ConfigurationName
+          - MinimumECSTaskCount
+        RoleName: pbr-pfm-infra-cva-ecs-role
+        ServiceName: !GetAtt ECSServiceStack.Outputs.ServiceName
+  ScalingPolicyStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/application-auto-scaling/ecs-scaling-policy.yaml
+      Parameters:
+        QualifiedDeploymentName: !Ref QualifiedDeploymentName
+        TargetARN: !GetAtt ScalableTargetStack.Outputs.TargetARN
+        TargetCPU: 70
+  MaxTasksAlarmStackMultipleActions:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateIntProdResources
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/cloud-watch/alarms/CloudwatchAlarm_Multiple_Actions.yaml
+      Parameters:
+        AlarmName: !Sub ${QualifiedDeploymentName}-${EnvironmentName}-CVA-ECS-Max-Tasks-alarm-with-multiple actions
+        AlarmDescription: '"{\"Configuration Item\":\"CAT Digital Platform\",\"AssignTo\":\"CatDigital-PerformanceOperationsCenter-Team\",\"Ticket\":\"True\",\"Impact\":\"medium\",\"Urgency\":\"medium\"}"'
+        TreatMissingData: "ignore"
+        AlarmActionsKey1: "InfraSns"
+        AlarmActionsValue1:
+          Fn::ImportValue: !Sub ${QualifiedDeploymentName}-sns-topic-arn
+        AlarmActionsKey2: "CdocSns"
+        AlarmActionsValue2:
+          !FindInMap [ConfigurationMap, !Ref ConfigurationName, SnowSnsTopic]
+        Namespace: ECS/ContainerInsights
+        MetricName: DesiredTaskCount
+        DimensionsKey1: "ClusterName"
+        DimensionsValue1: !GetAtt ECSClusterStack.Outputs.ClusterName
+        DimensionsKey2: "ServiceName"
+        DimensionsValue2: !GetAtt ECSServiceStack.Outputs.ServiceName
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        Unit: Count
+        Statistic: "Average"
+        AlarmEvaluationPeriods: 30
+        AlarmEvaluationPeriodSeconds: 60
+        Threshold: !GetAtt ScalableTargetStack.Outputs.MaximumTaskCount
+  APIGatewayVPCLinkStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/api-gateway/vpc-link.yaml
+      Parameters:
+        LoadBalancerARN: !GetAtt LoadBalancerStack.Outputs.LoadBalancerARN
+        VPCLinkName: !Ref QualifiedDeploymentName
+  InternalAPIGatewayRESTAPIStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/api-gateway/rest-apis/cva.yaml
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+        ExportNamePrefix: !Sub ${QualifiedDeploymentName}-internal-service
+        OpenAPIDocumentS3Key: !Sub
+          - open-api-documents/cva/master/main/internal/${Filename}
+          - Filename: !Select [4, !Split [/, !Ref OpenAPIDocumentS3Key]]
+        RESTAPIName: !Sub ${QualifiedDeploymentName}-internal
+        S3BucketName: !Ref S3BucketName
+  InternalAPIGatewayDeployment${build_id}:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !GetAtt InternalAPIGatewayRESTAPIStack.Outputs.RESTAPIID
+  InternalAPIGatewayClientCertificateStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/api-gateway/client-certificate.yaml
+      Parameters:
+        CertificateName: !Sub ${QualifiedDeploymentName}-internal
+  InternalAPIGatewayStageStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/api-gateway/stage.yaml
+      Parameters:
+        CertificateID: !GetAtt InternalAPIGatewayClientCertificateStack.Outputs.CertificateID
+        DeploymentID: !Ref InternalAPIGatewayDeployment${build_id}
+        ExportNamePrefix: !Sub ${QualifiedDeploymentName}-internal-service
+        QualifiedDeploymentName: !Sub ${QualifiedDeploymentName}-internal
+        RESTAPIID: !GetAtt InternalAPIGatewayRESTAPIStack.Outputs.RESTAPIID
+        StageName: !GetAtt InternalAPIGatewayRESTAPIStack.Outputs.StageName
+        VPCLinkID: !GetAtt APIGatewayVPCLinkStack.Outputs.VPCLinkID
+  InternalAPIGatewaySubscriptionFilterStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/logs/api-gateway-subscription-filter.yaml
+      Parameters:
+        LogCollectorKinesisARN: !Ref ApiGatewayLogCollectorKinesisARN
+        LogCollectorRoleARN: !Ref LogCollectorRoleARN
+        RESTAPIID: !GetAtt InternalAPIGatewayRESTAPIStack.Outputs.RESTAPIID
+        StageName: !GetAtt InternalAPIGatewayStageStack.Outputs.StageName
+  ExternalAPIGatewayRESTAPIStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/api-gateway/rest-apis/external.yaml
+      Parameters:
+        ConfigurationName: !Ref ConfigurationName
+        ExportNamePrefix: !Sub ${QualifiedDeploymentName}-external-service
+        OpenAPIDocumentS3Key: !Sub
+          - open-api-documents/cva/master/main/external/${Filename}
+          - Filename: !Select [4, !Split [/, !Ref OpenAPIDocumentS3Key]]
+        RESTAPIName: !Sub ${QualifiedDeploymentName}-external
+        S3BucketName: !Ref S3BucketName
+  ExternalAPIGatewayDeployment${build_id}:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !GetAtt ExternalAPIGatewayRESTAPIStack.Outputs.RESTAPIID
+  ExternalAPIGatewayClientCertificateStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/api-gateway/client-certificate.yaml
+      Parameters:
+        CertificateName: !Sub ${QualifiedDeploymentName}-external
+  ExternalAPIGatewayStageStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/api-gateway/stage.yaml
+      Parameters:
+        CertificateID: !GetAtt ExternalAPIGatewayClientCertificateStack.Outputs.CertificateID
+        DeploymentID: !Ref ExternalAPIGatewayDeployment${build_id}
+        ExportNamePrefix: !Sub ${QualifiedDeploymentName}-external-service
+        QualifiedDeploymentName: !Sub ${QualifiedDeploymentName}-external
+        RESTAPIID: !GetAtt ExternalAPIGatewayRESTAPIStack.Outputs.RESTAPIID
+        StageName: !GetAtt ExternalAPIGatewayRESTAPIStack.Outputs.StageName
+        VPCLinkID: !GetAtt APIGatewayVPCLinkStack.Outputs.VPCLinkID
+  ExternalApiGatewayUsagePlanKeyStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/api-gateway/usage-plan-key.yaml
+      Parameters:
+        Name: pfm-infra-cva
+        RestApi: !GetAtt ExternalAPIGatewayRESTAPIStack.Outputs.RESTAPIID
+        Stage: !GetAtt ExternalAPIGatewayStageStack.Outputs.StageName
+  ExternalAPIGatewaySubscriptionFilterStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/logs/api-gateway-subscription-filter.yaml
+      Parameters:
+        LogCollectorKinesisARN: !Ref ApiGatewayLogCollectorKinesisARN
+        LogCollectorRoleARN: !Ref LogCollectorRoleARN
+        RESTAPIID: !GetAtt ExternalAPIGatewayRESTAPIStack.Outputs.RESTAPIID
+        StageName: !GetAtt ExternalAPIGatewayStageStack.Outputs.StageName

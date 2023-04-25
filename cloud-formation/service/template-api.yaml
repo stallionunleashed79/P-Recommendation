@@ -1,0 +1,173 @@
+%YAML 1.2
+---
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  ApiGatewayLogCollectorKinesisARN:
+    Type: String
+  ApiGatewayLogCollectorRoleARN:
+    Type: String
+  ConfigurationName:
+    Type: String
+  DockerImageTagName:
+    Type: String
+  ECSSecurityGroupIDs:
+    Type: String
+  ECSSubnetIDs:
+    Type: String
+  EnvironmentName:
+    Type: String
+  LoadBalancerSubnetIDs:
+    Type: String
+  QualifiedDeploymentName:
+    Type: String
+  OpenAPIDocumentS3Key:
+    Type: String
+  S3BucketName:
+    Type: String
+  ShouldSetDesiredECSTaskCount:
+    Type: String
+    Default: True
+  VPCID:
+    Type: AWS::EC2::VPC::Id
+Mappings:
+  ConfigurationMap:
+    dev-main:
+      MaximumECSTaskCount: 6
+      MinimumECSTaskCount: 1
+      CloudWatchRetentionDays: 7
+      SnowSnsTopic: ""
+    int-main:
+      MaximumECSTaskCount: 6
+      MinimumECSTaskCount: 1
+      CloudWatchRetentionDays: 7
+      SnowSnsTopic: arn:aws:sns:us-east-2:546945837982:SNOWCatDigitalCustom
+    prod-main:
+      MaximumECSTaskCount: 8
+      MinimumECSTaskCount: 4
+      CloudWatchRetentionDays: 7
+      SnowSnsTopic: arn:aws:sns:us-east-2:620890749476:SNOWCatDigitalCustom
+Conditions:
+  IsProdEnvironment: !Equals [!Ref EnvironmentName, prod]
+  CreateIntProdResources:
+    !Or [!Equals [!Ref EnvironmentName, int], !Equals [!Ref EnvironmentName, prod]]
+Resources:
+  APIGatewayVPCLinkStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/api-gateway/vpc-link.yaml
+      Parameters:
+        LoadBalancerARN:
+          Fn::ImportValue:
+            !Sub "${QualifiedDeploymentName}-loadbalancerarn"
+        VPCLinkName: !Ref QualifiedDeploymentName
+  ExternalAPIGatewayRESTAPIStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/api-gateway/rest-apis/external.yaml
+      Parameters:
+        ConfigurationName: !Ref ConfigurationName
+        ExportNamePrefix: !Sub ${QualifiedDeploymentName}-external-service
+        OpenAPIDocumentS3Key: !Ref OpenAPIDocumentS3Key
+        RESTAPIName: !Sub ${QualifiedDeploymentName}-external
+        S3BucketName: !Ref S3BucketName
+  ExternalAPIGatewayDeployment${build_id}:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !GetAtt ExternalAPIGatewayRESTAPIStack.Outputs.RESTAPIID
+  ExternalAPIGatewayClientCertificateStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/api-gateway/client-certificate.yaml
+      Parameters:
+        CertificateName: !Sub ${QualifiedDeploymentName}-external
+  ExternalAPIGatewayStageStack1:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/api-gateway/stage.yaml
+      Parameters:
+        CertificateID: !GetAtt ExternalAPIGatewayClientCertificateStack.Outputs.CertificateID
+        DeploymentID: !Ref ExternalAPIGatewayDeployment${build_id}
+        ExportNamePrefix: !Sub ${QualifiedDeploymentName}-external-service
+        QualifiedDeploymentName: !Sub ${QualifiedDeploymentName}-external
+        RESTAPIID: !GetAtt ExternalAPIGatewayRESTAPIStack.Outputs.RESTAPIID
+        StageName: !GetAtt ExternalAPIGatewayRESTAPIStack.Outputs.StageName
+        VPCLinkID: !GetAtt APIGatewayVPCLinkStack.Outputs.VPCLinkID
+  UsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    Properties:
+      ApiStages:
+        - ApiId: !GetAtt ExternalAPIGatewayRESTAPIStack.Outputs.RESTAPIID
+          Stage: !GetAtt ExternalAPIGatewayStageStack1.Outputs.StageName
+      UsagePlanName: !Sub ${QualifiedDeploymentName}
+  APIKey:
+    Type: AWS::ApiGateway::ApiKey
+    DependsOn: UsagePlan
+    Properties: 
+      Enabled: true
+      Name: !Sub ${QualifiedDeploymentName}
+  UsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+      KeyId: !Ref APIKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref UsagePlan
+  ExternalAPIGatewaySubscriptionFilterStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/logs/api-gateway-subscription-filter.yaml
+      Parameters:
+        LogCollectorKinesisARN: !Ref ApiGatewayLogCollectorKinesisARN
+        LogCollectorRoleARN: !Ref ApiGatewayLogCollectorRoleARN
+        RESTAPIID: !GetAtt ExternalAPIGatewayRESTAPIStack.Outputs.RESTAPIID
+        StageName: !GetAtt ExternalAPIGatewayStageStack1.Outputs.StageName
+  RECO5XXAlarmMultipleActions:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateIntProdResources
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/cloud-watch/alarms/CloudwatchAlarm_Multiple_Actions.yaml
+      Parameters:
+        AlarmName: !Sub ${QualifiedDeploymentName}-${EnvironmentName}-5XX-alarm-with-multiple actions
+        AlarmDescription: '"{\"Configuration Item\":\"CAT Digital Platform\",\"AssignTo\":\"CatDigital-PerformanceOperationsCenter-Team\",\"Ticket\":\"True\",\"Impact\":\"medium\",\"Urgency\":\"medium\"}"'
+        TreatMissingData: "ignore"
+        AlarmActionsKey1: "RecoSupport"
+        AlarmActionsValue1:
+          Fn::ImportValue: !Sub pfm-reco-sns-${EnvironmentName}-topic-arn
+        Namespace: AWS/ApiGateway
+        MetricName: 5XXError
+        DimensionsKey1: "ApiName"
+        DimensionsValue1: !Sub ${QualifiedDeploymentName}-external
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        Unit: Count
+        Statistic: "Sum"
+        AlarmEvaluationPeriods: 1
+        AlarmEvaluationPeriodSeconds: 120
+        Threshold: 1
+  RECOHealthCheckAlarmMultipleActions:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateIntProdResources
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/cloud-watch/alarms/CloudwatchAlarm_Multiple_Actions.yaml
+      Parameters:
+        AlarmName: !Sub ${QualifiedDeploymentName}-${EnvironmentName}-RECO-Health-Check-alarm-with-multiple actions
+        AlarmDescription: '"{\"Configuration Item\":\"CAT Digital Platform\",\"AssignTo\":\"CatDigital-PerformanceOperationsCenter-Team\",\"Ticket\":\"True\",\"Impact\":\"medium\",\"Urgency\":\"medium\"}"'
+        TreatMissingData: "ignore"
+        AlarmActionsKey1: "RecoSupport"
+        AlarmActionsValue1:
+          Fn::ImportValue: !Sub pfm-reco-sns-${EnvironmentName}-topic-arn
+        Namespace: AWS/ApiGateway
+        MetricName: 5XXError
+        DimensionsKey1: "ApiName"
+        DimensionsValue1: !Sub ${QualifiedDeploymentName}-external
+        DimensionsKey2: "Resource"
+        DimensionsValue2: "/actuator/health"
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        Unit: Count
+        Statistic: "Sum"
+        AlarmEvaluationPeriods: 1
+        AlarmEvaluationPeriodSeconds: 120
+        Threshold: 1
+Outputs:
+  DeploymentId:
+    Value: !Ref ExternalAPIGatewayDeployment${build_id}
+  RestApiId:
+    Value: !GetAtt ExternalAPIGatewayRESTAPIStack.Outputs.RESTAPIID

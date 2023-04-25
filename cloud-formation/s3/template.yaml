@@ -1,0 +1,36 @@
+%YAML 1.2
+---
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  EnvironmentName:
+    Type: String
+  BucketName:
+    Type: String
+Mappings:
+  EnvironmentMap:
+    dev:
+      EnvironmentTag: Dev
+    int:
+      EnvironmentTag: Int
+    prod:
+      EnvironmentTag: Prod
+Resources:
+  RECOS3Bucket:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/S3.yml
+      Parameters:
+        applicationname: !Ref AWS::StackName
+        BucketName: !Ref BucketName
+        DataClassification: Red
+        Environment:
+          !FindInMap [EnvironmentMap, !Ref EnvironmentName, EnvironmentTag]
+        ManagedBy: leo
+        applicationid: pfm-reco
+        BusinessOwner: Banerjee_Shilpi@cat.com
+        TechnicalOwner: Gourishetty_Mehar_P@cat.com
+Outputs:
+  bucket2Name:
+    Value: !GetAtt RECOS3Bucket.Outputs.BucketName
+    Export:
+      Name: !Sub ${BucketName}-s3-bucket-name

@@ -1,0 +1,20 @@
+parameters:
+  awsCredentials: ''
+  regionName: ''
+  environmentName: ''
+  oasfile: ''
+
+steps:
+- script: |
+    mv $(Pipeline.Workspace)/s/${{ parameters.oasfile }} $(Pipeline.Workspace)/s/open-api/external/$(applicationName)-oas-$(Build.BuildId).yaml
+  displayName: Open Api File Versioning
+  workingDirectory: ${{ parameters.directoryName }}
+- task: S3Upload@1
+  displayName: Upload Open Api File
+  inputs:
+    awsCredentials: ${{ parameters.awsCredentials }}
+    regionName: ${{ parameters.regionName }}
+    bucketName: $(bucketName)
+    sourceFolder: $(Pipeline.Workspace)/s/open-api/external
+    globExpressions: $(applicationName)-oas-$(Build.BuildId).yaml
+    targetFolder: open-api

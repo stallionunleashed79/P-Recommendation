@@ -1,0 +1,23 @@
+resources:
+  repositories:
+    - repository: infraAzurePipelines
+      type: git
+      name: P-Data-Hub-Infra-CI-CD
+      ref: refs/tags/v10.0.0
+variables:
+  - template: /azure-pipelines/variables.yaml
+trigger:
+  batch: true
+  branches:
+    include:
+      - master
+  paths:
+    include:
+      - open-api/azure-pipelines/cd-pipeline.yaml
+      - open-api/document.yaml
+extends:
+  template: open-api-document/cd/deploy-to-environments.yaml@infraAzurePipelines
+  parameters:
+    serviceName: ${{ variables.serviceName }}
+    teamName: ${{ variables.teamName }}
+    dataClassificationLabel: ${{ variables.dataClassificationLabel }}

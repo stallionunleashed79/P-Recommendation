@@ -1,0 +1,23 @@
+parameters:
+  awsCredentials: ''
+  regionName: ''
+  environmentName: ''
+  applicationName: ''
+
+steps:
+- task: Docker@2
+  displayName: Load Docker Image
+  inputs:
+    command: load
+    arguments: --input $(Pipeline.Workspace)/P-Datahub-Reco-CI/docker-image/docker-image.tar
+
+
+- task: ECRPushImage@1
+  displayName: Push Docker Image to ECR
+  inputs:
+    awsCredentials: ${{ parameters.awsCredentials }}
+    regionName: ${{ parameters.regionName }}
+    sourceImageName: cat/digital/platform/reco/image
+    repositoryName: ${{ parameters.applicationName }}-${{ parameters.environmentName }}
+    pushTag: $(Build.BuildId)
+    autoCreateRepository: True

@@ -1,0 +1,129 @@
+trigger:
+  branches:
+    include:
+      - master
+      - huseyin.akten/cicd
+  paths:
+    exclude:
+      - azure-pipelines/cd
+      - azure-pipelines/extras
+      - cloud-formation/
+      - deployment/
+      - readme.md
+
+name: $(Build.BuildId)
+
+pool:
+  vmImage: ubuntu-18.04
+  
+variables:
+- group: pfm-reco
+- name: dockerImageName
+  value: cat/digital/platform/reco/image
+- name: dockerImageFilename
+  value: docker-image.tar
+
+
+stages:
+- stage: Build
+  jobs:
+  - job: Build
+    steps:
+    - checkout: self
+      displayName: Checkout repository
+      fetchDepth: 1
+    - template: restore-cache-step.yaml
+      parameters:
+        cacheDisplayName: Maven
+        cacheName: maven
+        cacheKeyFilePath: pom.xml
+        cachePath: $(HOME)/.m2/repository/
+    - task: SonarQubePrepare@4
+      displayName: Prepare SonarQube
+      inputs:
+        SonarQube: GIS SonarQube Server
+        scannerMode: Other
+        projectKey: 'com.cat.digital.reco:reco'
+        projectName: 'reco'
+        extraProperties: sonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml,target/site/jacoco-it/jacoco.xml
+    - template: restore-cache-step.yaml
+      parameters:
+        cacheDisplayName: SonarQube
+        cacheName: sonarQube
+        cacheKeyFilePath: pom.xml
+        cachePath: $(HOME)/.sonar/cache/
+    - script: |
+        sed -i "s/willbeplacedbycwsPassword/$(functionalTest.cwsPassword)/g" src/main/resources/config/application.yml
+      displayName: String replacement for passwd
+    - task: Maven@3
+      displayName: Run Maven Build app
+      inputs:
+        goals: verify
+        options: -Dspring.profiles.active=ci-cd -Daws.accessKeyName=id -Daws.secretKey=key
+        jdkVersionOption: 1.11
+        sonarQubeRunAnalysis: true
+        sqMavenPluginVersionChoice: pom
+    - task: SonarQubePublish@4
+      displayName: Publish SonarQube Quality Gate Status
+    - task: sonar-buildbreaker@8
+      displayName: Check SonarQube Quality Gate Status
+      inputs:
+        SonarQube: 'GIS SonarQube Server'
+    - task: reportgenerator@4
+      displayName: Generate Code Coverage Reports
+      inputs:
+        reports: $(Pipeline.Workspace)/s/target/site/jacoco/jacoco.xml
+        targetdir: $(Pipeline.Workspace)/s/target/site/reportgenerator
+        reporttypes: 'HtmlInline_AzurePipelines'
+        tag: '$(build.buildid)'
+    - task: PublishCodeCoverageResults@1
+      displayName: Publish Code Coverage Reports
+      inputs:
+        codeCoverageTool: 'JaCoCo'
+        summaryFileLocation: $(Pipeline.Workspace)/s/target/site/jacoco/jacoco.xml
+        reportDirectory: $(Pipeline.Workspace)/s/target/site/reportgenerator
+    - script: |
+        bash scripts/jacoco.sh
+      displayName: Check Code Coverage Reports
+
+    - task: Docker@2
+      displayName: Build Reco Docker image
+      inputs:
+        command: build
+        arguments: --tag $(dockerImageName)
+      env:
+        DOCKER_BUILDKIT: 1
+    - task: Docker@2
+      displayName: Start Postgress Container
+      inputs:
+        command: run
+        arguments: -d -p 5432:5432 --name postgresdb -e POSTGRES_PASSWORD=$(postgress_password) -e POSTGRES_USER=postgres -e POSTGRES_DB=reco postgres:10.7-alpine@sha256:44b6994b9577fff8cf5b980ca77a7e65a2ac4d237933be6fdd536c4a83af64b4
+    - task: Docker@2
+      displayName: Start Reco Container
+      inputs:
+        command: run
+        arguments: -d -p 8081:8080 --link postgresdb:postgresdb --name reco -e SPRING_PROFILES_ACTIVE=ci-cd -e SPRING_DATASOURCE_PASSWORD=$(postgress_password) $(dockerImageName)
+    - script: |
+        bash scripts/cicd.sh
+      displayName: Health Check Reco Container
+    - script: |
+        echo "##vso[task.setvariable variable=functionalTest.cwsPassword]$functionalTest.cwsPassword"
+      displayName: Set functional test variables
+    - script: |
+        mvn test-compile failsafe:integration-test failsafe:verify -Dspring.profiles.active=ci-cd
+      displayName: Maven Integration Test
+    - template: publish-ci-artifact-step.yaml
+      parameters:
+        artifactPath: $(Pipeline.Workspace)/s/target/pretty-cucumber/cucumber-html-reports
+        artifactDisplayName: Integration Test
+        artifactName: integration-test
+    - task: Docker@2
+      displayName: Save Docker image
+      inputs:
+        command: save
+        arguments: --output $(dockerImageFilename) $(dockerImageName)
+    - template: publish-ci-artifact-step.yaml
+      parameters:
+        artifactPath: $(dockerImageFilename)
+        artifactDisplayName: Docker Image
+        artifactName: docker-image

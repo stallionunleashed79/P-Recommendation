@@ -1,0 +1,68 @@
+server:
+  port: 8080
+
+#Use this profile if you are running the app locally and have mysql already running on localhost:3306
+logging:
+  config: src/main/resources/log4j2-spring-local.yaml
+  level:
+    root: INFO
+    com.cat: DEBUG
+
+env:
+  local: true
+
+# Spring data source
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: none
+  datasource:
+    url: jdbc:postgresql://localhost:5432/reco
+    username: seshab2
+    password: admin
+
+s3:
+  bucket: pfm-infra-cva-bucket-local
+
+
+guid:
+  url: https://guid.platform.dev.helios-internal.cat.com
+  proxies:
+    http: http://proxy.cat.com:80
+    https: http://proxy.cat.com:80
+
+dealer:
+  url: https://dealer-details.platform.dev.helios-internal.cat.com
+  path: /dealerDetails/v1/dealers/propertySearch
+  proxies:
+    http: http://proxy.cat.com:80
+    https: http://proxy.cat.com:80
+
+client:
+  user:
+    management:
+      url: https://services-qa.cat.com/catDigital/userManagement/v1
+      path: /users/
+      replace: '{catrecid}'
+  notes:
+    url: https://services-qa.cat.com
+    path: /catDigital/notes/v1/notes
+    maxNotesPerLevel: 1000
+    maxDepth: 5
+  storage:
+    url: https://services-qa.cat.com
+    path: /catDigital/storage/v1/files/metadata
+
+# global configuration
+global:
+  dealer:
+    region: us-east-2
+  proxy:
+    enable: true
+# template folder stylesheet
+template:
+    path: classpath:template/
+
+# functional tests parameters
+functionalTest:
+  url: http://localhost:8080

@@ -1,0 +1,864 @@
+openapi: 3.0.2
+info:
+  title: Recommendation External
+  description: "Recommendation API provides functionality to manage Condition Monitoring Recommendation."
+  version: 0.0.1
+  contact:
+    name: Helios API Support
+    email: heliosSupport@cat.com
+    url: https://dev.cat.com/support
+servers:
+  - url: https://services.cat.com/catDigital/recommendations/v1
+security:
+  - catFedLogin: []
+tags:
+  - name: Recommendations
+    description: Contains all the APIs related to recommendations
+paths:
+  /actuator/health:
+    get:
+      tags:
+        - Actuator Health
+      summary: Get actuator health
+      description: |
+        Perform health check on application
+      operationId: getActuatorHealth
+      parameters:
+        - $ref: '#/components/parameters/X-Cat-API-Tracking-Id'
+      responses:
+        200:
+          description: OK
+        400:
+          $ref: '#/components/responses/400BadRequest'
+        401:
+          $ref: '#/components/responses/401Unauthorized'
+        403:
+          $ref: '#/components/responses/403Forbidden'
+        404:
+          $ref: '#/components/responses/404NotFound'
+        413:
+          $ref: '#/components/responses/413PayloadTooLarge'
+        415:
+          $ref: '#/components/responses/415UnsupportedMediaType'
+        429:
+          $ref: '#/components/responses/429TooManyRequest'
+        500:
+          $ref: '#/components/responses/500InternalServerError'
+        503:
+          $ref: '#/components/responses/503ServiceUnavailable'
+      security:
+        - api_key: []
+      x-amazon-apigateway-integration:
+        uri: "https://${stageVariables.domainName}/actuator/health"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        connectionType: "VPC_LINK"
+        connectionId: "${stageVariables.vpcLinkID}"
+        httpMethod: "GET"
+        type: "http_proxy"
+  /actuator/info:
+    get:
+      tags:
+        - Monitoring
+      summary: Displays arbitrary application info
+      operationId: getVersion
+      description: Get app version.
+      parameters:
+        - $ref: '#/components/parameters/X-Cat-API-Tracking-Id'
+      responses:
+        200:
+          description: OK
+        400:
+          $ref: '#/components/responses/400BadRequest'
+        401:
+          $ref: '#/components/responses/401Unauthorized'
+        403:
+          $ref: '#/components/responses/403Forbidden'
+        404:
+          $ref: '#/components/responses/404NotFound'
+        413:
+          $ref: '#/components/responses/413PayloadTooLarge'
+        415:
+          $ref: '#/components/responses/415UnsupportedMediaType'
+        429:
+          $ref: '#/components/responses/429TooManyRequest'
+        500:
+          $ref: '#/components/responses/500InternalServerError'
+        503:
+          $ref: '#/components/responses/503ServiceUnavailable'
+      security:
+        - api_key: []
+      x-amazon-apigateway-integration:
+        uri: 'https://${stageVariables.domainName}/actuator/info'
+        responses:
+          default:
+            statusCode: '200'
+        passthroughBehavior: when_no_match
+        connectionType: VPC_LINK
+        connectionId: '${stageVariables.vpcLinkID}'
+        httpMethod: GET
+        type: http_proxy
+  /actuator/metrics:
+    get:
+      tags:
+        - Monitoring
+      summary: Fetch actuator metrics
+      operationId: getActuatorMetrics
+      description: Get actuator metrics.
+      parameters:
+        - $ref: '#/components/parameters/X-Cat-API-Tracking-Id'
+      responses:
+        200:
+          description: OK
+        400:
+          $ref: '#/components/responses/400BadRequest'
+        401:
+          $ref: '#/components/responses/401Unauthorized'
+        403:
+          $ref: '#/components/responses/403Forbidden'
+        404:
+          $ref: '#/components/responses/404NotFound'
+        413:
+          $ref: '#/components/responses/413PayloadTooLarge'
+        415:
+          $ref: '#/components/responses/415UnsupportedMediaType'
+        429:
+          $ref: '#/components/responses/429TooManyRequest'
+        500:
+          $ref: '#/components/responses/500InternalServerError'
+        503:
+          $ref: '#/components/responses/503ServiceUnavailable'
+      security:
+        - api_key: []
+      x-amazon-apigateway-integration:
+        uri: 'https://${stageVariables.domainName}/actuator/metrics'
+        responses:
+          default:
+            statusCode: '200'
+        passthroughBehavior: when_no_match
+        connectionType: VPC_LINK
+        connectionId: '${stageVariables.vpcLinkID}'
+        httpMethod: GET
+        type: http_proxy
+components:
+  schemas:
+    RecommendationNumber:
+      type: string
+      description: System generated number to identify an Recommendation.
+      format: string
+      example: 'REC 123-456-789'
+    AssetId:
+      type: string
+      example: CAT|RXZ00353|2969412354
+      description: >-
+        Asset identifier code
+    TemplateName:
+      type: string
+      example: Default template
+      description: Recommendation template
+    Title:
+      type: string
+      example: Draft Recommendation
+      description: Title of the recommendation
+    HoursReadingAtRecommendation:
+      type: object
+      required:
+        - reading
+        - unitOfMeasure
+      description: The Service Meter reading at the time of creating the recommendation
+      properties:
+        reading:
+          type: number
+          example: 5000
+          description: The reading at the time of creating the recommendation
+        unitOfMeasure:
+          type: string
+          example: 'hours'
+          description: The unit of measurement of the reading
+    CatRecId:
+      type: string
+      example: 'AAA-98765432'
+      description: The catericid of the recommendation user
+    BaseOwner:
+      type: object
+      required:
+        - catRecId
+      description: The owner of the recommendation
+      properties:
+        catRecId:
+          type: string
+          example: 'AAA-98765432'
+          description: The catericid of the recommendation owner, the value will be extracted from the logged in user if not provided
+    User:
+      type: object
+      required:
+        - catRecId
+      description: User Object
+      properties:
+        catRecId:
+          $ref: '#/components/schemas/CatRecId'
+        firstName:
+          type: string
+          description: First name of user
+          example: John
+        lastName:
+          type: string
+          description: Last name of User
+          example: Smith
+    ExpirationDate:
+      type: string
+      description: |
+        When the recommendation should expire.
+        Formatted string that represents date, time and timezone offset in ISO-8601 format.
+        For more information see https://tools.ietf.org/html/rfc3339.
+      format: date-time
+      pattern: '^\d{4}-\d\d-\d\d[Tt]\d\d:\d\d:\d\d(\.\d+)?(([+-]\d\d:\d\d)|[Zz])?$'
+      example: '2016-01-31T22:59:59.999Z'
+    CreatedDate:
+      type: string
+      description: |
+        When the recommendation was created.
+        Formatted string that represents date, time and timezone offset in ISO-8601 format.
+        For more information see https://tools.ietf.org/html/rfc3339.
+      format: date-time
+      pattern: '^\d{4}-\d\d-\d\d[Tt]\d\d:\d\d:\d\d(\.\d+)?(([+-]\d\d:\d\d)|[Zz])?$'
+      example: '2016-01-31T22:59:59.999Z'
+    UpdatedDate:
+      type: string
+      description: |
+        When the recommendation was last updated.
+        Formatted string that represents date, time and timezone offset in ISO-8601 format.
+        For more information see https://tools.ietf.org/html/rfc3339.
+      format: date-time
+      pattern: '^\d{4}-\d\d-\d\d[Tt]\d\d:\d\d:\d\d(\.\d+)?(([+-]\d\d:\d\d)|[Zz])?$'
+      example: '2016-01-31T22:59:59.999Z'
+    AttachedDate:
+      type: string
+      description: |
+        When the file was attached to the recommendation.
+        Formatted string that represents date, time and timezone offset in ISO-8601 format.
+        For more information see https://tools.ietf.org/html/rfc3339.
+      format: date-time
+      pattern: '^\d{4}-\d\d-\d\d[Tt]\d\d:\d\d:\d\d(\.\d+)?(([+-]\d\d:\d\d)|[Zz])?$'
+      example: '2016-01-31T22:59:59.999Z'
+    RecommendationFields:
+      type: object
+      required:
+        - propertyName
+        - propertyValue
+      description: Property of a request that changed with template
+      properties:
+        propertyName:
+          type: string
+          example: 'priority'
+          description: Name of the property
+        propertyValue:
+          type: string
+          example: '3 - At Next Service'
+          description: Value of the property
+    AssetMetaData:
+      description: Asset Meta Data of the asset associated with the recommendation
+      type: object
+      required:
+        - serialNumber
+        - make
+        - model
+        - name
+        - iconUrl
+        - productFamily
+      properties:
+        serialNumber:
+          type: string
+          description: Serial Number of asset associated with recommendation
+          example: '2WS23456'
+        make:
+          type: string
+          description: Make of asset associated with recommendation
+          example: "CAT"
+        model:
+          type: string
+          description: Model of asset associated with recommendation
+          example: "123AB"
+        name:
+          $ref: '#/components/schemas/AssetId'
+        iconUrl:
+          type: string
+          description: Url of the icon
+          example: "https://services.cat.com/images/wheelloader.png"
+        productFamily:
+          required:
+            - code
+            - name
+            - iconUrl
+          type: object
+          properties:
+            code:
+              type: string
+              description: "Code for Product Family of Asset"
+              example: "mwl"
+            name:
+              type: string
+              description: "Name for Product Family of Asset"
+              example: "Medium wheel loader"
+            iconUrl:
+              type: string
+              description: "Icon URL for Product Family of Asset"
+              example: "https://services.cat.com/images/2WS23456.png"
+    AssetOwnershipAtRecommendation:
+      description: Asset owner information for the recommendation
+      type: object
+      required:
+        - properties
+        - dealerName
+        - ucid
+        - ucidName
+      properties:
+        dealerCode:
+          type: string
+          description: Code of the dealer
+          example: "TD00"
+        dealerName:
+          type: string
+          description: Name of the dealer
+          example: "Holt"
+        ucid:
+          type: string
+          description: UCID of the customer
+          example: "25669890"
+        ucidName:
+          type: string
+          description: Name of the customer
+          example: "Waste Management"
+    Header:
+      type: object
+      required:
+        - owner
+        - hoursReadingAtRecommendation
+      description: The header part of the recommendation request body
+      properties:
+        owner:
+          $ref: '#/components/schemas/BaseOwner'
+        hoursReadingAtRecommendation:
+          $ref: '#/components/schemas/HoursReadingAtRecommendation'
+        site:
+          type: string
+          example: Asset location
+          description: Location of the asset
+    PutHeader:
+      type: object
+      required:
+        - title
+        - expirationDate
+        - header
+      description: The static part of the PUT Recommendation request body
+      allOf:
+        - '$ref': '#/components/schemas/Header'
+      properties:
+        title:
+          $ref: '#/components/schemas/Title'
+        expirationDate:
+          $ref: '#/components/schemas/ExpirationDate'
+    PostHeader:
+      type: object
+      required:
+        - header
+      description: The static part of the POST Recommendation request body
+      allOf:
+        - '$ref': '#/components/schemas/Header'
+      properties:
+        title:
+          $ref: '#/components/schemas/Title'
+        expirationDate:
+          $ref: '#/components/schemas/ExpirationDate'
+    GetHeader:
+      type: object
+      required:
+        - title
+        - expirationDate
+        - header
+      description: The static part of the Get Recommendation response body
+      allOf:
+        - '$ref': '#/components/schemas/Header'
+      properties:
+        title:
+          $ref: '#/components/schemas/Title'
+        expirationDate:
+          $ref: '#/components/schemas/ExpirationDate'
+        createdDate:
+          $ref: '#/components/schemas/CreatedDate'
+        updatedDate:
+          $ref: '#/components/schemas/UpdatedDate'
+        owner:
+          allOf:
+            - '$ref': '#/components/schemas/User'
+          description: The user information for the owner of the recommendation
+        createdBy:
+          allOf:
+            - '$ref': '#/components/schemas/User'
+          description: The user information for the creator of the recommendation
+        updatedBy:
+          allOf:
+            - '$ref': '#/components/schemas/User'
+          description: The user information of who last updated the recommendation
+        assetOwnershipAtRecommendation:
+          $ref: '#/components/schemas/AssetOwnershipAtRecommendation'
+        assetMetadata:
+          $ref: '#/components/schemas/AssetMetaData'
+    RecommendationDetailsGet:
+      type: object
+      required:
+        - assetId
+        - requestHeader
+      description: Request body to create a recommendation
+      properties:
+        recommendationNumber:
+          $ref: '#/components/schemas/RecommendationNumber'
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        templateName:
+          $ref: '#/components/schemas/TemplateName'
+        header:
+          $ref: '#/components/schemas/GetHeader'
+        fields:
+          type: array
+          items:
+            "$ref": "#/components/schemas/RecommendationFields"
+        attachments:
+          type: array
+          description: List of attachments associated with the recommendation.
+          items:
+            $ref: '#/components/schemas/RecommendationAttachments'
+        links:
+          type: array
+          description: List of links associated with the recommendation. Requires ReferenceId as a parameter.
+          items:
+            $ref: '#/components/schemas/RecommendationLinks'
+        exceptions:
+          $ref: '#/components/schemas/RecommendationExceptions'
+        events:
+          $ref: '#/components/schemas/RecommendationEvents'
+    RecommendationAttachments:
+      type: object
+      description: Attachments associated with the recommendation
+      required:
+        - name
+        - url
+      properties:
+        name:
+          type: string
+          description: Name of the attachment
+          example: "File Name"
+        url:
+          type: string
+          description: URL of the attachment
+          example: "https://services.cat.com/catDigital/storage/v1/files/{id}/metadata"
+        attachedDate:
+          $ref: '#/components/schemas/AttachedDate'
+    RecommendationLinks:
+      type: object
+      description: Links associated with the recommendation
+      required:
+        - name
+        - url
+      properties:
+        name:
+          type: string
+          description: Name of the link.
+          example: "Link Name"
+        url:
+          type: string
+          description: URL of the link.
+          example: "https://example.com"
+    RecommendationExceptions:
+      type: string
+      description: URL for the exceptions associated with the recommendation.
+      # Not sure about his one.
+      example: "https://services.cat.com/catDigital/conditionMonitoring/v1/{referenceID}"
+    RecommendationEvents:
+      type: string
+      description: URL for the events associated with the recommendation. Can filter based on id as a parameter
+      example: "https://services.cat.com/catDigital/conditionMonitoring/v1/events"
+    RecommendationCurrencies:
+      type: object
+      description: List of currencies
+      properties:
+        currencies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Currencies'
+    Currencies:
+      type: object
+      description: Currencies
+      required:
+        - currencyCode
+        - currencyName
+      properties:
+        currencyCode:
+          type: string
+          description: "Three leter code of the currency - ISO-4217"
+          example: "USD"
+        currencyName:
+          type: string
+          description: "Full name of the currency"
+          example: "US Dollar"
+    RecommendationPostRequest:
+      type: object
+      required:
+        - assetId
+        - requestHeader
+      description: Request body to create a recommendation
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        templateName:
+          $ref: '#/components/schemas/TemplateName'
+        header:
+          $ref: '#/components/schemas/PostHeader'
+        fields:
+          type: array
+          items:
+            "$ref": "#/components/schemas/RecommendationFields"
+    RecommendationPutRequest:
+      type: object
+      required:
+        - header
+      description: Request body to update a recommendation
+      properties:
+        header:
+          $ref: '#/components/schemas/PutHeader'
+        fields:
+          type: array
+          items:
+            "$ref": "#/components/schemas/RecommendationFields"
+    RecommendationPostResponse:
+      type: object
+      required:
+        - recommendationNumber
+      description: Response of the create recommendation API
+      properties:
+        recommendationNumber:
+          $ref: '#/components/schemas/RecommendationNumber'
+    RecommendationPublishRequest:
+      type: object
+      required:
+        - recipients
+        - subject
+        - sendCopyToSender
+      description: Request body to publish/send a recommendation
+      properties:
+        recipients:
+          type: object
+          description: Recipients for the recommendation. Allow multiple email address. At least one (to) recipient is required
+          required:
+            - to
+          properties:
+            to:
+              type: array
+              items:
+                type: string
+                example: "user.name@email.com"
+              minItems: 1
+              example:
+                - user.name@email.com
+                - userto.name@email.com
+            cc:
+              type: array
+              items:
+                type: string
+                example: "user.name2@email.com"
+              example:
+                - user.name2@email.com
+            bcc:
+              type: array
+              items:
+                type: string
+                example: "user.name3@email.com"
+              example:
+                - user.name3@email.com
+        subject:
+          type: string
+          description: Subject for the recommendation.
+          example: Title of recommendation
+          minLength: 10
+          maxLength: 200
+        message:
+          type: string
+          description: Email content for the recommendation.
+          example: Dealer please apply the recommendation actions added in the PDF file
+          minLength: 0
+          maxLength: 2000
+
+        sendCopyToSender:
+          type: boolean
+          description: true - Indicates the sender want to have a copy of email.
+          default: true
+          example: true
+    MetadataResponse:
+      type: object
+      description: Response of the recommendation metadata
+      properties:
+        recommendationNumber:
+          $ref: '#/components/schemas/RecommendationNumber'
+        totalAttachmentSize:
+          type: number
+          example: 10.5
+          description: The current attachments size for existing recommendations
+        representUnit:
+          type: string
+          example: MB
+          description: Unit of information or computer storage
+        files:
+          type: array
+          items:
+            type: object
+            properties:
+              fileName:
+                type: string
+                description: File name
+                example: report.xls
+              contentLenght:
+                type: number
+                description: Actual content size of file
+                example: 1500
+              url:
+                type: string
+                description: File URL of the attachment
+                example: https://domain.com/fileName
+              status:
+                type: string
+                description: status of file
+                example: uploaded
+              includedInEmail:
+                type: boolean
+                description: flag to indicate that file will be included in the recommendation email when published
+                example: false
+          example:
+            - fileName: "Report.xls"
+              contentLenght: 1500
+              status: "uploaded"
+              includedInEmail: true
+              url: https://domain.com/fileName
+
+            - fileName: "Actions.pdf"
+              contentLenght: 1000
+              status: "uploaded"
+              includedInEmail: false
+              url: https://domain.com/fileName2
+    Error:
+      type: object
+      description: |
+        Represents an error code, description, and detailed error message for a given endpoint.
+        Every HTTP status code returns a different `code` value in the response based on the nature
+        of the error that occurred.
+        Also, one HTTP status code can return different `code` for different use cases.
+        The below table shows mapping of different `Code`, 'HTTP Error Message' and `Description`
+        for each HTTP status code. HTTP 405 error will be thrown when incorrect HTTP method is used
+        for any endpoint.
+
+        | **HTTP Status Code** | **Code** | **HTTP Error Message** | **Description** |
+        | ------------- |:-------------:|-------------:|-------------:|
+        | `400` | `400.001` | Bad Request | Unknown error occurred. |
+        | `400` | `400.002` | Bad Request | Threat detected: maximum allowed limit of request is exceeded. |
+        | `400` | `400.006` | Bad Request | Missing required field(s). |
+        | `400` | `400.008` | Bad Request | Invalid or missing request body. |
+        | `400` | `400.009` | Bad Request | Body not allowed. |
+        | `400` | `400.010` | Bad Request | XML schema is not valid. |
+        | `401` | `401.001` | Unauthorized | Invalid access token. |
+        | `401` | `401.002` | Unauthorized | Access token expired. |
+        | `401` | `401.003` | Unauthorized | API product mismatch for token. |
+        | `401` | `401.004` | Unauthorized | Insufficient scope for application. |
+        | `401` | `401.005` | Unauthorized | Invalid API key for given resource. |
+        | `401` | `401.006` | Unauthorized | Missing access token. |
+        | `401` | `401.007` | Unauthorized | Invalid or expired access token. |
+        | `401` | `401.008` | Unauthorized | User not authorized. |
+        | `403` | `403.001` | Forbidden | Request not coming from valid IP. |
+        | `403` | `403.002` | Forbidden | There was an error getting entitlements. |
+        | `403` | `403.003` | Forbidden | ClientId: <ClientId> does not have permission for: <http method> <ResourceURL>.|
+        | `404` | `404.001` | Not Found | Resource not found. |
+        | `405` | `405.001` | Method Not Allowed | Method not allowed. |
+        | `406` | `406.001` | Not Acceptable | Request not acceptable. The target resource does not have a current representation that would be acceptable to the user agent. |
+        | `409` | `409.001` | Conflict | Request conflicts with current state. |
+        | `413` | `413.001` | Payload Too Large | Payload too large. |
+        | `415` | `415.001` | Unsupported Media Type | Unsupported media type. Requested payload format is not supported by this method on the target resource. The format problem might be due to the request's indicated content-type or content-encoding, or as a result of inspecting the data directly. |
+        | `429` | `429.001` | Too Many Requests | Throttling rate limit exceeded. |
+        | `429` | `429.002` | Too Many Requests | Quota rate limit exceeded. |
+        | `500` | `500.001` | Internal Server Error | Server error. |
+        | `500` | `500.002` | Internal Server Error | Shared flow not found. |
+        | `500` | `500.003` | Internal Server Error | Script execution failed. |
+        | `500` | `500.004` | Internal Server Error | Error occurred while getting response from backend. Please try later. |
+        | `500` | `500.005` | Internal Server Error | Missing mandatory configuration properties. |
+        | `500` | `500.006` | Internal Server Error | Unable to AssumeRole for authentication. |
+        | `503` | `503.001` | Service Unavailable | The service is temporarily unavailable. |
+        | `504` | `504.001` | Gateway Timeout | Request timed out. |
+
+      ###Please add the backend error code in the above table. Don't use above error codes (reserved for Apigee) as backend error ###
+      properties:
+        code:
+          type: string
+          description: Error Code represents an alpha-numeric error code received from the error.
+          example: '403'
+        description:
+          type: string
+          description: Message represents a textual description of a given error code.
+          example: 'Forbidden User'
+      required:
+        - code
+        - description
+  responses:
+    PostResponse:
+      description: OK
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RecommendationPostResponse'
+    400BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          example:
+            code: "400.001"
+            description: "Unknown error occured."
+          schema:
+            $ref: "#/components/schemas/Error"
+    401Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          example:
+            code: "401.006"
+            description: "Missing Authorization header or token value."
+          schema:
+            $ref: "#/components/schemas/Error"
+    403Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          example:
+            code: "403.001"
+            description: Forbidden
+          schema:
+            $ref: "#/components/schemas/Error"
+    404NotFound:
+      description: Not Found
+      content:
+        application/json:
+          example:
+            code: "404.001"
+            description: Resource Not Found
+          schema:
+            $ref: "#/components/schemas/Error"
+    406RequestNotAcceptable:
+      description: Request Not Acceptable
+      content:
+        application/json:
+          example:
+            code: "406.001"
+            description: Request not acceptable
+          schema:
+            $ref: "#/components/schemas/Error"
+    413PayloadTooLarge:
+      description: Request payload is too large
+      content:
+        application/json:
+          example:
+            code: "413.001"
+            description: "Request payload is too large"
+          schema:
+            $ref: "#/components/schemas/Error"
+    415UnsupportedMediaType:
+      description: Unsupported Media Type
+      content:
+        application/json:
+          example:
+            code: "415.001"
+            description: Requested payload format is not supported by this method on the target resource. The format problem might be due to the request's indicated Content-Type or Content-Encoding, or as a result of inspecting the data directly.
+          schema:
+            $ref: "#/components/schemas/Error"
+    429TooManyRequest:
+      description: Too Many Requests.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: '429.001'
+            description: Too many requests.
+    500InternalServerError:
+      description: Internal Server Error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: '500.001'
+            description: Internal Server Error.
+    503ServiceUnavailable:
+      description: Service Unavailable.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: '503.001'
+            description: Service unavailable.
+  parameters:
+    currencySearch:
+      name: search
+      in: query
+      required: false
+      description: Search term for the currency endpoint. Searches on both currency code and name.
+      explode: false
+      schema:
+        type: string
+      example: "USD"
+    recommendationNumber:
+      name: recommendationNumber
+      in: path
+      required: true
+      description: Unique Identifier of recommendation.
+      explode: false
+      schema:
+        $ref: '#/components/schemas/RecommendationNumber'
+    X-Cat-API-Tracking-Id:
+      name: X-Cat-API-Tracking-Id
+      in: header
+      description: A unique ID generated for each request.
+      required: false
+      schema:
+        type: string
+        format: uuid
+      example: '33aa372a-a4e4-11ea-bb37-0242ac130002'
+    X-Cat-User-Preferences:
+      name: X-Cat-User-Preferences
+      in: header
+      description: |
+        Global user preferences for formatting the API response. You can get the
+        preferences for the user with Cat Digital User Preferences API. The
+        value must be passed in as a base64-encoded string.
+      required: false
+      schema:
+        type: string
+        format: byte
+        example: ewogICAgICAgICJ1c2VyUHJvdmlkZWQiOiB7CiAgICAgICAgICAgICJhc3NldExhYmVsIjogImFzc2V0SWQiLAogICAgICAgICAgICAiYXNzZXRMb2NhdGlvbkxhYmVsIjogImxhdExvbiIKICAgICAgICB9LAogICAgICAgICJkZWZhdWx0cyI6IHsKICAgICAgICAgICAgImFzc2V0TGFiZWwiOiAiYXNzZXRJZCIsCiAgICAgICAgICAgICJhc3NldExvY2F0aW9uTGFiZWwiOiAiYWRkcmVzcyIsCiAgICAgICAgICAgICJsYW5ndWFnZSI6ICJlbiIsCiAgICAgICAgICAgICJ0aW1lem9uZSI6ICJVVEMiLAogICAgICAgICAgICAidGltZUZvcm1hdCI6ICJob3VyczI0IiwKICAgICAgICAgICAgImRhdGVGb3JtYXQiOiAiZGRtbXl5eXkiLAogICAgICAgICAgICAibnVtYmVyRm9ybWF0IjogInJhZGl4Q29tYSIsCiAgICAgICAgICAgICJzeXN0ZW1PZk1lYXN1cmVtZW50IjogIm1ldHJpYyIsCiAgICAgICAgICAgICJ0ZW1wZXJhdHVyZVVuaXQiOiAiY2Vsc2l1cyIsCiAgICAgICAgICAgICJwcmVzc3VyZVVuaXQiOiAicHNpIgogICAgICAgIH0KICAgIH0= # encoded string
+  securitySchemes:
+    catFedLogin:
+      type: oauth2
+      description: Authentication using Cat FedLogin and the OAuth 2.0 framework.
+      flows:
+        implicit:
+          authorizationUrl: https://fedlogin.cat.com/as/authorization.oauth2?pfidpadapterid=OAuthAdapterCCDS
+          scopes: {}
+        authorizationCode:
+          authorizationUrl: https://fedlogin.cat.com/as/authorization.oauth2?pfidpadapterid=OAuthAdapterCCDS
+          tokenUrl: https://fedlogin.cat.com/as/token.oauth2?pfidpadapterid=OAuthAdapterCCDS
+          refreshUrl: https://fedlogin.cat.com/as/token.oauth2?pfidpadapterid=OAuthAdapterCCDS
+          scopes: {}
+        clientCredentials:
+          tokenUrl: https://fedlogin.cat.com/as/token.oauth2?pfidpadapterid=OAuthAdapterCCDS
+          scopes: {}
+    api_key:
+      type: "apiKey"
+      name: "x-api-key"
+      in: "header"

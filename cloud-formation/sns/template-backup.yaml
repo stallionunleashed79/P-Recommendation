@@ -1,0 +1,30 @@
+%YAML 1.2
+---
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  ShouldCreateSubscription:
+    Type: String
+  TopicName:
+    Type: String
+Conditions:
+  IsMasterBranchOnboardingDeployment: !Equals
+    - !Ref TopicName
+    - pfm-infra-cva-master-onboarding
+  IsNotMasterBranchOnboardingDeployment: !Not
+    - !Condition IsMasterBranchOnboardingDeployment
+Resources:
+  TopicStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/sns/topic.yaml
+      Parameters:
+        ExportNamePrefix: !Ref AWS::StackName
+        TopicName: !Ref TopicName
+  SubscriptionStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsNotMasterBranchOnboardingDeployment
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/sns/subscription.yaml
+      Parameters:
+        ShouldCreateSubscription: !Ref ShouldCreateSubscription
+        TopicARN: !GetAtt TopicStack.Outputs.TopicARN

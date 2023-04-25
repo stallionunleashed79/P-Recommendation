@@ -1,0 +1,221 @@
+parameters:
+  - name: ENV_SUFFIX
+    type: string
+  - name: ROLE_ARN
+    type: string
+  - name: BUILD_NUMBER
+    type: string
+  - name: AWS_CREDENTIALS
+    type: string
+  - name: DISPLAY_NAME
+    type: string
+  - name: GATED_ENV
+    type: string
+  - name: REGION_NAME
+    type: string
+  - name: SecurityGroupIDs
+    type: string
+  - name: SubnetIDs
+    type: string
+  - name: CertificateARN
+    type: string
+  - name: ApiGatewayLogCollectorKinesisARN
+    type: string
+  - name: ApiGatewayLogCollectorRoleARN
+    type: string
+  - name: ECSSecurityGroupIDs
+    type: string
+  - name: VPCID
+    type: string
+
+stages:
+- stage: ${{parameters.ENV_SUFFIX}}_Deployment
+  ${{ if ne(parameters.ENV_SUFFIX, 'dev') }}:
+    condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/huseyin.akten/cicd')))
+  variables:
+    bucketName: $(bucketPrefix)-${{ parameters.ENV_SUFFIX }}-${{ parameters.REGION_NAME }}
+    env: ${{ parameters.ENV_SUFFIX }}
+  displayName: ${{ parameters.DISPLAY_NAME }}
+  jobs:
+  - deployment: ${{ parameters.ENV_SUFFIX }}_Deployment
+    displayName: ${{ parameters.DISPLAY_NAME }}
+    environment: ${{ parameters.GATED_ENV }}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+
+          - checkout: self
+            displayName: Checkout repository
+            fetchDepth: 1
+
+          - template: 111-cf-stack-task.yaml
+            parameters:
+              condition: and(succeeded(), ne(variables['Build.Reason'], 'ResourceTrigger'))
+              awsCredentials: ${{ parameters.AWS_CREDENTIALS }}
+              roleARN: ${{ parameters.ROLE_ARN }}
+              regionName: ${{ parameters.REGION_NAME }}
+              applicationName: $(applicationName)
+              teamName: $(teamName)
+              dataClassificationLabel: $(dataClassificationLabel)
+              riskDomainLabel: $(riskdomain)
+              environmentName: ${{ parameters.ENV_SUFFIX }}
+              displayName: 'Deploy S3 Bucket'
+              stackName: $(applicationName)-s3-${{ parameters.ENV_SUFFIX }}
+              templateFile: $(Build.SourcesDirectory)/cloud-formation/s3/template.yaml
+              templateParameters: |
+                [ { "ParameterKey": "EnvironmentName", "ParameterValue": "${{ parameters.ENV_SUFFIX }}" },
+                  { "ParameterKey": "BucketName", "ParameterValue": "$(applicationName)-${{ parameters.ENV_SUFFIX }}" } ]
+
+          - template: 111-cf-stack-task.yaml
+            parameters:
+              condition: and(succeeded(), ne(variables['Build.Reason'], 'ResourceTrigger'))
+              awsCredentials: ${{ parameters.AWS_CREDENTIALS }}
+              roleARN: ${{ parameters.ROLE_ARN }}
+              regionName: ${{ parameters.REGION_NAME }}
+              applicationName: $(applicationName)
+              teamName: $(teamName)
+              dataClassificationLabel: $(dataClassificationLabel)
+              riskDomainLabel: $(riskdomain)
+              environmentName: ${{ parameters.ENV_SUFFIX }}
+              displayName: 'Deploy SNS Template'
+              stackName: $(applicationName)-sns-${{ parameters.ENV_SUFFIX }}
+              templateFile: $(Build.SourcesDirectory)/cloud-formation/sns/template.yaml
+              templateParameters: |
+                [ { "ParameterKey": "TopicName", "ParameterValue": "$(applicationName)-${{ parameters.ENV_SUFFIX }}" },
+                  { "ParameterKey": "EnvironmentName", "ParameterValue": "${{ parameters.ENV_SUFFIX }}" },
+                  { "ParameterKey": "ShouldCreateSubscription", "ParameterValue": "True" } ]
+
+          - template: 111-cf-stack-task.yaml
+            parameters:
+              condition: and(succeeded(), ne(variables['Build.Reason'], 'ResourceTrigger'))
+              awsCredentials: ${{ parameters.AWS_CREDENTIALS }}
+              roleARN: ${{ parameters.ROLE_ARN }}
+              regionName: ${{ parameters.REGION_NAME }}
+              applicationName: $(applicationName)
+              teamName: $(teamName)
+              dataClassificationLabel: $(dataClassificationLabel)
+              riskDomainLabel: $(riskdomain)
+              environmentName: ${{ parameters.ENV_SUFFIX }}
+              displayName: 'Deploy Domain Name External'
+              stackName: $(applicationName)-extdomainname-${{ parameters.ENV_SUFFIX }}
+              templateFile: $(Build.SourcesDirectory)/cloud-formation/external/domain-name/template.yaml
+              templateParameters: |
+                [ { "ParameterKey": "EnvironmentName", "ParameterValue": "${{ parameters.ENV_SUFFIX }}" },
+                  { "ParameterKey": "CertificateARN", "ParameterValue": "${{ parameters.CertificateARN }}" } ]
+
+          - template: 111-cf-stack-task.yaml
+            parameters:
+              condition: and(succeeded(), ne(variables['Build.Reason'], 'ResourceTrigger'))
+              awsCredentials: ${{ parameters.AWS_CREDENTIALS }}
+              roleARN: ${{ parameters.ROLE_ARN }}
+              regionName: ${{ parameters.REGION_NAME }}
+              applicationName: $(applicationName)
+              teamName: $(teamName)
+              dataClassificationLabel: $(dataClassificationLabel)
+              riskDomainLabel: $(riskdomain)
+              environmentName: ${{ parameters.ENV_SUFFIX }}
+              displayName: 'Deploy Postgres Database'
+              stackName: $(applicationName)-postgres-${{ parameters.ENV_SUFFIX }}
+              templateFile: $(Build.SourcesDirectory)/cloud-formation/rds/template.yaml
+              templateParameters: |
+                [ { "ParameterKey": "ConfigurationName", "ParameterValue": "${{ parameters.ENV_SUFFIX }}-main" },
+                  { "ParameterKey": "EnvironmentName", "ParameterValue": "${{ parameters.ENV_SUFFIX }}" },
+                  { "ParameterKey": "QualifiedDeploymentName", "ParameterValue": "$(applicationName)-${{ parameters.ENV_SUFFIX }}" },
+                  { "ParameterKey": "SecurityGroupIDs", "ParameterValue": "${{ parameters.SecurityGroupIDs }}" },
+                  { "ParameterKey": "SubnetIDs", "ParameterValue": "${{ parameters.SubnetIDs }}" } ]
+
+          - template: 112-upload-image.yaml
+            parameters:
+              awsCredentials: ${{ parameters.AWS_CREDENTIALS }}
+              regionName: ${{ parameters.REGION_NAME }}
+              environmentName: ${{ parameters.ENV_SUFFIX }}
+              applicationName: $(applicationName)
+
+          - ${{ if eq(parameters.ENV_SUFFIX, 'dev') }}:
+            - script:
+                sed -i "s/ECSServiceStackNumber/ECSServiceStackNumber$(Build.BuildId)/g" cloud-formation/service/template-ecs.yaml
+              displayName: Replace ECS Template Temp Variables
+
+          - template: 111-cf-stack-task.yaml
+            parameters:
+              condition: succeeded()
+              awsCredentials: ${{ parameters.AWS_CREDENTIALS }}
+              roleARN: ${{ parameters.ROLE_ARN }}
+              regionName: ${{ parameters.REGION_NAME }}
+              applicationName: $(applicationName)
+              teamName: $(teamName)
+              dataClassificationLabel: $(dataClassificationLabel)
+              riskDomainLabel: $(riskdomain)
+              environmentName: ${{ parameters.ENV_SUFFIX }}
+              displayName: 'Deploy ECS/Fargate Service'
+              stackName: $(applicationName)-service-${{ parameters.ENV_SUFFIX }}
+              templateFile: $(Build.SourcesDirectory)/cloud-formation/service/template-ecs.yaml
+              templateParameters: |
+                [ { "ParameterKey": "ConfigurationName", "ParameterValue": "${{ parameters.ENV_SUFFIX }}-main" },
+                  { "ParameterKey": "DockerImageTagName", "ParameterValue": "$(Build.BuildId)" },
+                  { "ParameterKey": "ECSSecurityGroupIDs", "ParameterValue": "${{ parameters.ECSSecurityGroupIDs }}" },
+                  { "ParameterKey": "ECSSubnetIDs", "ParameterValue": " ${{ parameters.SubnetIDs }}" },
+                  { "ParameterKey": "EnvironmentName", "ParameterValue": "${{ parameters.ENV_SUFFIX }}" },
+                  { "ParameterKey": "LoadBalancerSubnetIDs", "ParameterValue": "${{ parameters.SubnetIDs }}" },
+                  { "ParameterKey": "QualifiedDeploymentName", "ParameterValue": "$(applicationName)-${{ parameters.ENV_SUFFIX }}" },
+                  { "ParameterKey": "OpenAPIDocumentS3Key", "ParameterValue": "open-api/document-$(Build.BuildId).yaml" },
+                  { "ParameterKey": "S3BucketName", "ParameterValue": "$(bucketName)" },
+                  { "ParameterKey": "VPCID", "ParameterValue": "${{ parameters.VPCID }}" } ]
+
+          - template: 113-upload-openapi.yaml
+            parameters:
+              awsCredentials: ${{ parameters.AWS_CREDENTIALS }}
+              regionName: ${{ parameters.REGION_NAME }}
+              environmentName: ${{ parameters.ENV_SUFFIX }}
+              oasfile: open-api/external/catDigitalPlatform-recommendations-v1-oas.yaml
+
+          - script:
+              sed -i "s/\${build_id}/$(Build.BuildId)/g" cloud-formation/service/template-api.yaml
+            displayName: Replace ApiGW Template Variables
+
+          - template: 111-cf-stack-task.yaml
+            parameters:
+              condition: succeeded()
+              awsCredentials: ${{ parameters.AWS_CREDENTIALS }}
+              roleARN: ${{ parameters.ROLE_ARN }}
+              regionName: ${{ parameters.REGION_NAME }}
+              applicationName: $(applicationName)
+              teamName: $(teamName)
+              dataClassificationLabel: $(dataClassificationLabel)
+              riskDomainLabel: $(riskdomain)
+              environmentName: ${{ parameters.ENV_SUFFIX }}
+              displayName: 'Deploy Api Gateway'
+              stackName: $(applicationName)-apigw-${{ parameters.ENV_SUFFIX }}
+              templateFile: $(Build.SourcesDirectory)/cloud-formation/service/template-api.yaml
+              templateParameters: |
+                [ { "ParameterKey": "ApiGatewayLogCollectorKinesisARN", "ParameterValue": "${{ parameters.ApiGatewayLogCollectorKinesisARN }}" },
+                  { "ParameterKey": "ApiGatewayLogCollectorRoleARN", "ParameterValue": "${{ parameters.ApiGatewayLogCollectorRoleARN }}" },
+                  { "ParameterKey": "ConfigurationName", "ParameterValue": "${{ parameters.ENV_SUFFIX }}-main" },
+                  { "ParameterKey": "DockerImageTagName", "ParameterValue": "$(Build.BuildId)" },
+                  { "ParameterKey": "ECSSecurityGroupIDs", "ParameterValue": "${{ parameters.ECSSecurityGroupIDs }}" },
+                  { "ParameterKey": "ECSSubnetIDs", "ParameterValue": " ${{ parameters.SubnetIDs }}" },
+                  { "ParameterKey": "EnvironmentName", "ParameterValue": "${{ parameters.ENV_SUFFIX }}" },
+                  { "ParameterKey": "LoadBalancerSubnetIDs", "ParameterValue": "${{ parameters.SubnetIDs }}" },
+                  { "ParameterKey": "QualifiedDeploymentName", "ParameterValue": "$(applicationName)-${{ parameters.ENV_SUFFIX }}" },
+                  { "ParameterKey": "OpenAPIDocumentS3Key", "ParameterValue": "open-api/$(applicationName)-oas-$(Build.BuildId).yaml" },
+                  { "ParameterKey": "S3BucketName", "ParameterValue": "$(bucketName)" },
+                  { "ParameterKey": "VPCID", "ParameterValue": "${{ parameters.VPCID }}" } ]
+
+          - template: 111-cf-stack-task.yaml
+            parameters:
+              condition: and(succeeded(), ne(variables['Build.Reason'], 'ResourceTrigger'))
+              awsCredentials: ${{ parameters.AWS_CREDENTIALS }}
+              roleARN: ${{ parameters.ROLE_ARN }}
+              regionName: ${{ parameters.REGION_NAME }}
+              applicationName: $(applicationName)
+              teamName: $(teamName)
+              dataClassificationLabel: $(dataClassificationLabel)
+              riskDomainLabel: $(riskdomain)
+              environmentName: ${{ parameters.ENV_SUFFIX }}
+              displayName: 'Deploy Domain Name Mapping'
+              stackName: $(applicationName)-domainnamemapping-${{ parameters.ENV_SUFFIX }}
+              templateFile: $(Build.SourcesDirectory)/cloud-formation/external/domain-name-mapping/template.yaml
+              templateParameters: |
+                [ { "ParameterKey": "EnvironmentName", "ParameterValue": "${{ parameters.ENV_SUFFIX }}" } ]
+

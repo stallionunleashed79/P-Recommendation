@@ -1,0 +1,35 @@
+%YAML 1.2
+---
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  BranchName:
+    Type: String
+  CertificateARN:
+    Type: String
+  DeploymentName:
+    Type: String
+  EnvironmentName:
+    Type: String
+Conditions:
+  IsMasterBranch: !Equals [!Ref BranchName, master]
+  IsMainDeployment: !Equals [!Ref DeploymentName, main]
+  IsMasterBranchMainDeployment:
+    !And [!Condition IsMasterBranch, !Condition IsMainDeployment]
+Resources:
+  Stack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://catdigital-azdo-central-us-east-2.s3.us-east-2.amazonaws.com/baseTemplates/Platform-Echo/aws/api-gateway/domain-name.yaml
+      Parameters:
+        CertificateARN: !Ref CertificateARN
+        DomainName: !If
+          - IsMasterBranchMainDeployment
+          - !Sub apigee-cva.platform.${EnvironmentName}.helios-internal.cat.com
+          - !If
+            - IsMasterBranch
+            - !Sub apigee-cva-${DeploymentName}.platform.${EnvironmentName}.helios-internal.cat.com
+            - !If
+              - IsMainDeployment
+              - !Sub ${BranchName}-apigee-cva.platform.${EnvironmentName}.helios-internal.cat.com
+              - !Sub ${BranchName}-apigee-cva-${DeploymentName}.platform.${EnvironmentName}.helios-internal.cat.com
+        ExportName: !Sub ${AWS::StackName}
